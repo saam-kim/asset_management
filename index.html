@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Life-Balance Simulator - 청소년 재무설계 & 자산관리 교육</title>
+    <meta name="description" content="중학생 대상의 게임처럼 즐기는 재무설계 및 자산관리 시뮬레이션 웹 애플리케이션입니다. 생애 버킷리스트 비용 산출, 소득/지출 매칭 수조 실험, 복리 투자 효과를 레이싱 게임으로 체감해보세요!">
+    
+    <!-- Firebase SDK (Compat Version for Vanilla JS compatibility) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Confetti Overlays for Celebrations -->
+    <canvas id="confetti-canvas"></canvas>
+
+    <!-- Global App Header -->
+    <header class="app-header">
+        <div class="logo" id="app-logo">
+            <span>Edu</span> Life-Balance
+        </div>
+        <nav class="progress-steps" id="progress-steps" style="display: none;">
+            <div class="step-item active" id="step-1-indicator">
+                <div class="step-number">1</div>
+                드림 보드
+            </div>
+            <div class="step-item" id="step-2-indicator">
+                <div class="step-number">2</div>
+                리얼리티 체크
+            </div>
+            <div class="step-item" id="step-3-indicator">
+                <div class="step-number">3</div>
+                자산 증식 레이스
+            </div>
+        </nav>
+        <div class="header-actions">
+            <span id="user-display" style="font-weight: 700; font-size: 15px; color: var(--text-muted);"></span>
+        </div>
+    </header>
+
+    <main class="container">
+        
+        <!-- 1. LANDING VIEW -->
+        <section id="landing-view" class="view-panel active">
+            <div class="landing-grid">
+                <div class="landing-left">
+                    <span class="badge">금융 교육 시뮬레이터</span>
+                    <h1 class="landing-title">내 인생의<br>라이프 밸런스 설계</h1>
+                    <p class="landing-desc">
+                        내가 꿈꾸는 미래의 삶에는 얼마가 필요할까요?<br>
+                        AI 비용 추산, 현실적인 수입과 지출 관리, 그리고 은행 적금과 자산 투자의 놀라운 복리 격차를 게임처럼 재미있게 확인해 보세요.
+                    </p>
+                    <button class="btn btn-secondary" id="go-teacher-login-btn" style="align-self: flex-start;">
+                        🔑 교사용 대시보드로 입장하기
+                    </button>
+                </div>
+                <div class="glass-card login-card">
+                    <h2 style="margin-bottom: 24px; text-align: center;">학생 접속하기</h2>
+                    <form id="student-join-form" onsubmit="return false;">
+                        <div class="form-group">
+                            <label for="input-session-id">6자리 세션 번호</label>
+                            <input type="text" id="input-session-id" class="form-input" placeholder="교사 대시보드의 6자리 번호 입력" required pattern="[0-9]{6}" maxlength="6">
+                        </div>
+                        <div class="form-group">
+                            <label for="input-student-name">본인 이름 (또는 닉네임)</label>
+                            <input type="text" id="input-student-name" class="form-input" placeholder="출석부의 이름 입력" required maxlength="10">
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="student-join-submit" style="width: 100%; margin-top: 10px;">
+                            🚀 시뮬레이션 입장하기
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. TEACHER LOGIN VIEW -->
+        <section id="teacher-login-view" class="view-panel">
+            <div class="glass-card login-card" style="margin: 80px auto;">
+                <h2 style="margin-bottom: 12px; text-align: center;">교사용 로그인</h2>
+                <p style="text-align: center; margin-bottom: 24px;">교사용 비밀번호 PIN 번호를 입력해 주세요.</p>
+                <form id="teacher-login-form" onsubmit="return false;">
+                    <div class="form-group">
+                        <label for="input-teacher-pin">PIN 번호 (기본: 1234)</label>
+                        <input type="password" id="input-teacher-pin" class="form-input" placeholder="4자리 PIN 입력" required maxlength="4" style="text-align: center; letter-spacing: 0.5em; font-size: 20px;">
+                    </div>
+                    <div style="display: flex; gap: 12px;">
+                        <button type="button" class="btn btn-secondary" id="teacher-login-back" style="flex: 1;">이전으로</button>
+                        <button type="submit" class="btn btn-primary" style="flex: 1.5;">대시보드 입장</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- TEACHER SETUP VIEW (BEFORE SESSION CREATION) -->
+        <section id="teacher-setup-view" class="view-panel">
+            <div class="glass-card" style="max-width: 800px; margin: 40px auto;">
+                <h2 style="margin-bottom: 8px; text-align: center;">수업 시뮬레이션 환경 설정</h2>
+                <p style="text-align: center; margin-bottom: 32px;">
+                    시뮬레이션에서 사용할 기본 고정 필수 지출 금액을 수업 환경에 맞춰 수정할 수 있습니다.<br>
+                    설정을 마친 후 아래 버튼을 누르면 학생들에게 공유할 세션 번호가 활성화됩니다.
+                </p>
+                
+                <div class="setup-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                    <!-- Meal Costs Group -->
+                    <div style="background: #F8FAFC; padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border);">
+                        <h3 style="margin-bottom: 12px; color: var(--primary);">🍳 식비 설정</h3>
+                        <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                            <label style="margin-bottom: 0; font-weight: 600;">알뜰 집밥</label>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="number" id="setup-cost-meal_home" class="form-input" style="width: 100px; padding: 8px;" value="30" min="0">
+                                <span>만원</span>
+                            </div>
+                        </div>
+                        <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                            <label style="margin-bottom: 0; font-weight: 600;">외식 & 배달</label>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="number" id="setup-cost-meal_out" class="form-input" style="width: 100px; padding: 8px;" value="60" min="0">
+                                <span>만원</span>
+                            </div>
+                        </div>
+                        <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0;">
+                            <label style="margin-bottom: 0; font-weight: 600;">미식가/카페</label>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="number" id="setup-cost-meal_gourmet" class="form-input" style="width: 100px; padding: 8px;" value="120" min="0">
+                                <span>만원</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Housing Costs Group -->
+                    <div style="background: #F8FAFC; padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border);">
+                        <h3 style="margin-bottom: 12px; color: var(--primary);">🏢 주거비 설정</h3>
+                        <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                            <label style="margin-bottom: 0; font-weight: 600;">월세 임대료</label>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="number" id="setup-cost-house_rent" class="form-input" style="width: 100px; padding: 8px;" value="80" min="0">
+                                <span>만원</span>
+                            </div>
+                        </div>
+                        <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                            <label style="margin-bottom: 0; font-weight: 600;">전세대출 이자</label>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="number" id="setup-cost-house_loan" class="form-input" style="width: 100px; padding: 8px;" value="50" min="0">
+                                <span>만원</span>
+                            </div>
+                        </div>
+                        <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0;">
+                            <label style="margin-bottom: 0; font-weight: 600;">자가 관리비</label>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="number" id="setup-cost-house_own" class="form-input" style="width: 100px; padding: 8px;" value="15" min="0">
+                                <span>만원</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transport Costs Group -->
+                    <div style="background: #F8FAFC; padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border);">
+                        <h3 style="margin-bottom: 12px; color: var(--primary);">🚌 교통/차량 설정</h3>
+                        <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                            <label style="margin-bottom: 0; font-weight: 600;">대중교통</label>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="number" id="setup-cost-trans_public" class="form-input" style="width: 100px; padding: 8px;" value="10" min="0">
+                                <span>만원</span>
+                            </div>
+                        </div>
+                        <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                            <label style="margin-bottom: 0; font-weight: 600;">실속 자가용</label>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="number" id="setup-cost-trans_car" class="form-input" style="width: 100px; padding: 8px;" value="50" min="0">
+                                <span>만원</span>
+                            </div>
+                        </div>
+                        <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0;">
+                            <label style="margin-bottom: 0; font-weight: 600;">스포츠카 플렉스</label>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="number" id="setup-cost-trans_super" class="form-input" style="width: 100px; padding: 8px;" value="150" min="0">
+                                <span>만원</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hobby Costs Group -->
+                    <div style="background: #F8FAFC; padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border);">
+                        <h3 style="margin-bottom: 12px; color: var(--primary);">🎨 여가/취미 설정</h3>
+                        <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                            <label style="margin-bottom: 0; font-weight: 600;">친구 모임/구독</label>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="number" id="setup-cost-hobby_basic" class="form-input" style="width: 100px; padding: 8px;" value="20" min="0">
+                                <span>만원</span>
+                            </div>
+                        </div>
+                        <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                            <label style="margin-bottom: 0; font-weight: 600;">문화생활/피트니스</label>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="number" id="setup-cost-hobby_medium" class="form-input" style="width: 100px; padding: 8px;" value="50" min="0">
+                                <span>만원</span>
+                            </div>
+                        </div>
+                        <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0;">
+                            <label style="margin-bottom: 0; font-weight: 600;">호캉스/골프/해외</label>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="number" id="setup-cost-hobby_vip" class="form-input" style="width: 100px; padding: 8px;" value="100" min="0">
+                                <span>만원</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: center; gap: 16px; margin-top: 32px;">
+                    <button class="btn btn-secondary" id="btn-setup-back" style="flex: 1; max-width: 200px;">이전으로</button>
+                    <button class="btn btn-primary" id="btn-setup-complete" style="flex: 1.5; max-width: 300px;">설정 완료 및 세션 개설</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. TEACHER DASHBOARD VIEW -->
+        <section id="teacher-dashboard-view" class="view-panel">
+            <div class="teacher-header">
+                <div class="teacher-session-box">
+                    <span class="teacher-session-label">수업 세션 번호</span>
+                    <span class="teacher-session-number" id="teacher-session-id">------</span>
+                    <button class="btn btn-secondary" id="btn-add-demo-students" style="padding: 8px 16px; font-size: 13px;">
+                        🤖 데모 학생 5명 추가
+                    </button>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button class="btn btn-secondary" id="btn-open-config" style="padding: 10px 18px; font-size: 14px;">
+                        ⚙️ Firebase 설정
+                    </button>
+                    <button class="btn btn-danger" id="teacher-logout-btn" style="padding: 10px 18px; font-size: 14px;">
+                        로그아웃
+                    </button>
+                </div>
+            </div>
+            
+            <div class="teacher-grid">
+                <!-- Students List -->
+                <div class="glass-card teacher-student-panel">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <h2>접속 학생 목록 (<span id="student-count">0</span>명)</h2>
+                        <div style="display: flex; gap: 8px; font-size: 11px; font-weight: 700;">
+                            <span style="color: #3B82F6;">● Stage 1</span>
+                            <span style="color: #F59E0B;">● Stage 2</span>
+                            <span style="color: #10B981;">● Stage 3</span>
+                        </div>
+                    </div>
+                    <div class="student-list-container" id="student-list-container">
+                        <!-- Student Item Cards get inserted here -->
+                        <div class="empty-placeholder" style="margin: auto;">
+                            <div class="icon">👥</div>
+                            <p>아직 입장한 학생이 없습니다.<br>세션 번호를 학생들에게 공유해 주세요!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Word Cloud Dynamic Analytics -->
+                <div class="glass-card teacher-cloud-panel">
+                    <h2>실시간 학생 드림 키워드 (Word Cloud)</h2>
+                    <p>반 학생들이 가장 많이 버킷리스트에 추가한 목표들을 시각화합니다.</p>
+                    <div class="word-cloud-container">
+                        <canvas id="word-cloud-canvas" class="word-cloud-canvas"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. STUDENT STAGE 1: DREAM BOARD -->
+        <section id="student-stage1-view" class="view-panel">
+            <div class="dream-header">
+                <span class="badge">Stage 1</span>
+                <h2>나만의 미래 드림 보드 작성</h2>
+                <p>내가 어른이 되어 이루고 싶은 버킷리스트와 목표들을 설정해보세요. 각 연령대를 누르고 카테고리를 선택한 후 이루고 싶은 꿈을 적어보세요!</p>
+            </div>
+
+            <div class="dream-layout">
+                <!-- Left Control Box -->
+                <div class="glass-card dream-board-container">
+                    <div class="age-group-tabs" id="age-group-tabs">
+                        <button class="age-tab active" data-age="20s">20대 청년기</button>
+                        <button class="age-tab" data-age="30s">30대 정착기</button>
+                        <button class="age-tab" data-age="40s">40대+ 성숙기</button>
+                    </div>
+
+                    <div class="dream-input-section">
+                        <label style="font-weight: 700; font-size: 15px; color: var(--text);">꿈의 종류(카테고리) 선택</label>
+                        <div class="category-selector" id="category-selector">
+                            <button class="category-btn active" data-category="travel">
+                                <span class="category-icon">✈️</span>
+                                <span>여행</span>
+                            </button>
+                            <button class="category-btn" data-category="tech">
+                                <span class="category-icon">💻</span>
+                                <span>IT기기/쇼핑</span>
+                            </button>
+                            <button class="category-btn" data-category="housing">
+                                <span class="category-icon">🏠</span>
+                                <span>주거/공간</span>
+                            </button>
+                            <button class="category-btn" data-category="experience">
+                                <span class="category-icon">🎓</span>
+                                <span>경험/공부</span>
+                            </button>
+                            <button class="category-btn" data-category="car">
+                                <span class="category-icon">🚗</span>
+                                <span>자동차/취미</span>
+                            </button>
+                            <button class="category-btn" data-category="hobby">
+                                <span class="category-icon">🎨</span>
+                                <span>자기개발</span>
+                            </button>
+                        </div>
+
+                        <div class="form-group" style="margin-top: 10px; margin-bottom: 0;">
+                            <label for="input-bucket-text">이루고 싶은 버킷리스트 (추천 예시 클릭 가능)</label>
+                            
+                            <!-- Suggested Keywords Grid -->
+                            <div id="keyword-suggestions" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+                                <!-- Inserts preset tags dynamically based on selected category -->
+                            </div>
+
+                            <div class="bucket-input-wrapper">
+                                <input type="text" id="input-bucket-text" class="form-input" placeholder="예: 스위스 한달 살기, 아이패드 프로 사기" maxlength="30">
+                                <button class="btn btn-primary" id="btn-estimate-cost" style="white-space: nowrap; padding: 0 20px;">
+                                    🤖 AI 비용 분석
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Live Board -->
+                <div class="glass-card" style="display: flex; flex-direction: column; height: 100%;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h2>나의 드림 리스트</h2>
+                        <span style="font-weight: 700; color: var(--primary); font-size: 15px;" id="dream-list-count">총 0개</span>
+                    </div>
+
+                    <div class="bucket-list-panel empty" id="student-bucket-panel">
+                        <div class="empty-placeholder">
+                            <div class="icon">✨</div>
+                            <p>버킷리스트를 추가해 주세요!<br>AI가 전 세계 데이터로 예상 필요 자금을 알려줍니다.</p>
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-primary" id="btn-go-stage2" style="width: 100%; margin-top: 24px;" disabled>
+                        현실 점검 단계로 넘어가기 (최소 2개 이상 등록) ➡️
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. STUDENT STAGE 2: REALITY CHECK -->
+        <section id="student-stage2-view" class="view-panel">
+            <div class="dream-header">
+                <span class="badge">Stage 2</span>
+                <h2>현실 점검: 인생의 수조 채우기</h2>
+                <p>미래의 월급과 생활을 위해 필요한 지출 항목을 선택해 보세요. 과연 내 수입으로 필수 지출과 앞서 정한 버킷리스트들을 채워나갈 수 있을까요?</p>
+            </div>
+
+            <div class="reality-layout">
+                <!-- Left Selection Panel -->
+                <div class="glass-card" style="display: flex; flex-direction: column; gap: 24px;">
+                    <!-- Salary slider -->
+                    <div class="salary-selector-card">
+                        <div class="salary-header">
+                            <h3 style="font-weight: 700;">내 미래 예상 월급 (실수령액)</h3>
+                            <span class="salary-display" id="salary-display-val">300만 원</span>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" id="salary-range" class="custom-range" min="1000000" max="10000000" step="100000" value="3000000">
+                        </div>
+                    </div>
+
+                    <div class="salary-selector-card" style="margin-top: 16px; border-left: 4px solid var(--primary);">
+                        <div class="salary-header">
+                            <h3 style="font-weight: 700; color: var(--primary);">🎯 내 월 드림 저축액 설정</h3>
+                            <span class="salary-display" id="dream-saving-display-val" style="color: var(--primary);">100만 원</span>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" id="dream-saving-range" class="custom-range" min="0" max="5000000" step="50000" value="1000000">
+                        </div>
+                        <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;" id="dream-saving-recommend-text">
+                            * 버킷리스트 달성을 위한 권장 최소 저축액: 0만 원
+                        </p>
+                    </div>
+
+                    <!-- Essential Gear Selections -->
+                    <div class="expenses-section">
+                        <!-- Expense Group 1: Meals -->
+                        <div class="expense-group">
+                            <div class="expense-title">식비 (식습관)</div>
+                            <div class="expense-cards" id="expense-group-meals">
+                                <div class="expense-card active" data-type="meal" data-id="meal_home" data-cost="300000">
+                                    <span class="expense-card-icon">🍳</span>
+                                    <span class="expense-card-name">알뜰 집밥</span>
+                                    <span class="expense-card-cost" data-cost-id="meal_home">30만 원</span>
+                                </div>
+                                <div class="expense-card" data-type="meal" data-id="meal_out" data-cost="600000">
+                                    <span class="expense-card-icon">🍕</span>
+                                    <span class="expense-card-name">외식 & 배달</span>
+                                    <span class="expense-card-cost" data-cost-id="meal_out">60만 원</span>
+                                </div>
+                                <div class="expense-card" data-type="meal" data-id="meal_gourmet" data-cost="1200000">
+                                    <span class="expense-card-icon">🥩</span>
+                                    <span class="expense-card-name">미식가/카페</span>
+                                    <span class="expense-card-cost" data-cost-id="meal_gourmet">120만 원</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Expense Group 2: Housing -->
+                        <div class="expense-group">
+                            <div class="expense-title">주거비 (거주 유형)</div>
+                            <div class="expense-cards" id="expense-group-housing">
+                                <div class="expense-card active" data-type="housing" data-id="house_rent" data-cost="800000">
+                                    <span class="expense-card-icon">🏢</span>
+                                    <span class="expense-card-name">월세 생활</span>
+                                    <span class="expense-card-cost" data-cost-id="house_rent">80만 원</span>
+                                </div>
+                                <div class="expense-card" data-type="housing" data-id="house_loan" data-cost="500000">
+                                    <span class="expense-card-icon">🏦</span>
+                                    <span class="expense-card-name">전세대출 이자</span>
+                                    <span class="expense-card-cost" data-cost-id="house_loan">50만 원</span>
+                                </div>
+                                <div class="expense-card" data-type="housing" data-id="house_own" data-cost="150000">
+                                    <span class="expense-card-icon">🏠</span>
+                                    <span class="expense-card-name">자가 관리비</span>
+                                    <span class="expense-card-cost" data-cost-id="house_own">15만 원</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Expense Group 3: Transportation -->
+                        <div class="expense-group">
+                            <div class="expense-title">교통 및 차량</div>
+                            <div class="expense-cards" id="expense-group-transport">
+                                <div class="expense-card active" data-type="transport" data-id="trans_public" data-cost="100000">
+                                    <span class="expense-card-icon">🚌</span>
+                                    <span class="expense-card-name">대중교통</span>
+                                    <span class="expense-card-cost" data-cost-id="trans_public">10만 원</span>
+                                </div>
+                                <div class="expense-card" data-type="transport" data-id="trans_car" data-cost="500000">
+                                    <span class="expense-card-icon">🚗</span>
+                                    <span class="expense-card-name">실속 자가용</span>
+                                    <span class="expense-card-cost" data-cost-id="trans_car">50만 원</span>
+                                </div>
+                                <div class="expense-card" data-type="transport" data-id="trans_super" data-cost="1500000">
+                                    <span class="expense-card-icon">🏎️</span>
+                                    <span class="expense-card-name">스포츠카 플렉스</span>
+                                    <span class="expense-card-cost" data-cost-id="trans_super">150만 원</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Expense Group 4: Life style -->
+                        <div class="expense-group">
+                            <div class="expense-title">여가 및 취미 (통신/구독 포함)</div>
+                            <div class="expense-cards" id="expense-group-hobby">
+                                <div class="expense-card active" data-type="hobby" data-id="hobby_basic" data-cost="200000">
+                                    <span class="expense-card-icon">☕</span>
+                                    <span class="expense-card-name">친구 모임/구독</span>
+                                    <span class="expense-card-cost" data-cost-id="hobby_basic">20만 원</span>
+                                </div>
+                                <div class="expense-card" data-type="hobby" data-id="hobby_medium" data-cost="500000">
+                                    <span class="expense-card-icon">🎸</span>
+                                    <span class="expense-card-name">문화생활/피트니스</span>
+                                    <span class="expense-card-cost" data-cost-id="hobby_medium">50만 원</span>
+                                </div>
+                                <div class="expense-card" data-type="hobby" data-id="hobby_vip" data-cost="100000">
+                                    <span class="expense-card-icon">🏌️</span>
+                                    <span class="expense-card-name">호캉스/골프/해외</span>
+                                    <span class="expense-card-cost" data-cost-id="hobby_vip">100만 원</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Water Tank Visualizer -->
+                <div class="glass-card" style="display: flex; flex-direction: column; align-items: center; justify-content: space-between;">
+                    <h2 style="align-self: flex-start;">나의 현금 흐름 수조</h2>
+                    
+                    <div class="water-tank-wrapper">
+                        <div class="tank-container">
+                            <div class="tank-floater" id="tank-floater-emoji">😀</div>
+                            <canvas id="water-tank-canvas" class="tank-canvas"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="water-metrics">
+                        <div class="metric-row metric-inflow">
+                            <span>월 수입 (물 유입량)</span>
+                            <span id="metric-inflow-val">+3,000,000원</span>
+                        </div>
+                        <div class="metric-row metric-outflow">
+                            <span>월 지출 (물 유출량: 고정비+드림저축)</span>
+                            <span id="metric-outflow-val">-1,200,000원</span>
+                        </div>
+                        <div class="metric-row metric-net" id="metric-net-row">
+                            <span>잔여 현금 흐름 (월 여유 자금)</span>
+                            <span id="metric-net-val">1,800,000원</span>
+                        </div>
+                        <p style="font-size: 12px; text-align: center; color: var(--text-muted);">
+                            * 월 지출액에는 고정소비 외에 드림보드의 꿈들을 60세까지 달성하기 위해 매달 모아야 하는 '목표 적립금'이 함께 합산되어 있습니다.
+                        </p>
+                    </div>
+
+                    <button class="btn btn-primary" id="btn-go-stage3" style="width: 100%; margin-top: 20px;">
+                        자산 증식 시뮬레이터 도전하기 ➡️
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 6. STUDENT STAGE 3: THE POWER OF INVESTMENT -->
+        <section id="student-stage3-view" class="view-panel">
+            <div class="dream-header">
+                <span class="badge">Stage 3</span>
+                <h2>자산 증식 시뮬레이터: 저축 vs 투자</h2>
+                <p>여유 자금을 어떻게 굴려야 더 빨리, 더 많이 자산을 모을 수 있을까요? 20세부터 60세까지 40년 동안 은행 예적금과 나만의 자산 투자 포트폴리오의 격차를 생생하게 체험해 보세요.</p>
+            </div>
+
+            <div class="invest-layout">
+                <!-- Settings Area -->
+                <div class="invest-split">
+                    <!-- Savings Track -->
+                    <div class="invest-track-card primary-track">
+                        <div class="track-header">
+                            <h3>A. 은행 예적금</h3>
+                            <span class="track-badge track-badge-savings">안정적인 저축</span>
+                        </div>
+                        <p>원금은 보장되지만 금리가 낮아 복리 효과를 충분히 누리기 어렵습니다.</p>
+                        <div class="track-rate-input" style="background: #F1F5F9;">
+                            <div class="track-rate-header">
+                                <span>가정 연이율</span>
+                                <span style="color: var(--text); font-weight: 800;">연 2.0% (고정)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Portfolio Track -->
+                    <div class="invest-track-card portfolio-track">
+                        <div class="track-header">
+                            <h3>B. 분산 투자 포트폴리오</h3>
+                            <span class="track-badge track-badge-portfolio">수익성 자산 운용</span>
+                        </div>
+                        <p>주식, 채권, 부동산 등에 자산을 배분하여 시장 성장률 수준의 수익률을 겨냥합니다.</p>
+                        <div class="track-rate-input">
+                            <div class="track-rate-header">
+                                <span>목표 연평균 수익률</span>
+                                <span style="color: var(--primary); font-weight: 800;" id="investment-rate-val">연 6.0%</span>
+                            </div>
+                            <div class="slider-container">
+                                <input type="range" id="investment-rate-range" class="custom-range" min="1" max="15" step="0.5" value="6">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Simulation Graph Arena -->
+                <div class="glass-card racing-arena">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="color: white; font-weight: 800;">자산 증식 40년 레이싱 (20세 ~ 60세)</h3>
+                        <span id="sim-speed-indicator" style="font-size: 13px; font-weight: 600; color: #38BDF8;"></span>
+                    </div>
+
+                    <canvas id="racing-graph-canvas" class="racing-canvas"></canvas>
+
+                    <div class="racing-timeline-info">
+                        <div class="racing-age-display">
+                            나이: <span id="racing-age-val">20</span>세
+                        </div>
+                        <div class="racing-stats">
+                            <div class="racing-stat-box">
+                                <div class="racing-stat-label">예적금 누적액</div>
+                                <div class="racing-stat-value racing-stat-savings" id="racing-savings-val">0만 원</div>
+                            </div>
+                            <div class="racing-stat-box">
+                                <div class="racing-stat-label">투자 포트폴리오 누적액</div>
+                                <div class="racing-stat-value racing-stat-portfolio" id="racing-portfolio-val">0만 원</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="sim-controls">
+                    <button class="btn btn-primary" id="btn-start-simulation" style="padding: 16px 40px; font-size: 18px; width: 100%; max-width: 400px; display: inline-flex; align-items: center; justify-content: center; gap: 12px;">
+                        🟢 레이싱 시뮬레이션 시작!
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- AI RESULT MODAL -->
+    <div class="ai-modal" id="ai-modal">
+        <div class="ai-modal-card">
+            <!-- Loading View -->
+            <div class="ai-loading-view" id="ai-loading-view">
+                <div class="ai-spinner">
+                    <div class="ai-spinner-circle"></div>
+                    <div class="ai-spinner-icon">🤖</div>
+                </div>
+                <div class="ai-loading-text">AI 비용 분석가가 분석 중입니다...</div>
+                <p style="font-size: 13px;">전 세계 시세 및 연령대별 생활물가 통계를 탐색하여 적합한 필요 자금을 계산 중입니다.</p>
+            </div>
+            <!-- Result View -->
+            <div class="ai-result-view" id="ai-result-view">
+                <div class="ai-result-header">
+                    <h3 id="ai-result-title">스위스 한 달 살기</h3>
+                    <p id="ai-result-age">20대 추천 버킷리스트</p>
+                </div>
+                <div class="ai-result-body">
+                    <div class="ai-result-cost-box" style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px; border: 2px dashed rgba(59, 130, 246, 0.3); border-radius: var(--radius-md); background: rgba(59, 130, 246, 0.03);">
+                        <div class="ai-result-label" style="font-weight: 700; color: var(--primary); margin-bottom: 4px;">예상 필요 자금 범위 (직접 수정 가능)</div>
+                        <div style="display: flex; align-items: center; gap: 8px; justify-content: center; width: 100%;">
+                            <input type="number" id="ai-result-cost-min" class="form-input" style="width: 110px; text-align: center; font-size: 20px; font-weight: 800; padding: 6px 12px; color: var(--primary); border: 2px solid var(--border); border-radius: var(--radius-sm);" min="0">
+                            <span style="font-weight: 800; font-size: 18px; color: var(--text-muted);">~</span>
+                            <input type="number" id="ai-result-cost-max" class="form-input" style="width: 110px; text-align: center; font-size: 20px; font-weight: 800; padding: 6px 12px; color: var(--primary); border: 2px solid var(--border); border-radius: var(--radius-sm);" min="0">
+                            <span style="font-weight: 800; font-size: 16px; color: var(--text);">만 원</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Cost Breakdown details -->
+                    <div class="ai-result-breakdown" id="ai-result-breakdown">
+                        <!-- Dynamically filled with detailed items -->
+                    </div>
+
+                    <div class="ai-result-tip">
+                        <div class="ai-result-tip-icon">💡</div>
+                        <div id="ai-result-tip-text">유럽 물가가 높지만 한식 요리를 직접 해 먹고 저가 항공을 미리 예매하면 예산을 줄일 수 있습니다.</div>
+                    </div>
+                    <div class="ai-result-actions">
+                        <button class="btn btn-secondary" id="ai-result-cancel">취소</button>
+                        <button class="btn btn-primary" id="ai-result-confirm">내 보드에 추가</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- REPORT MODAL -->
+    <div class="report-modal" id="report-modal">
+        <div class="report-modal-card">
+            <div class="report-header">
+                <h2 id="report-congrats-title">🎉 시뮬레이션 완료!</h2>
+                <p>축하합니다! 60세까지의 라이프 밸런스 결과 리포트입니다.</p>
+            </div>
+            <div class="report-body">
+                <div class="report-summary-box">
+                    <div class="report-summary-title">예적금 대비 포트폴리오 투자 격차</div>
+                    <div class="report-summary-value" id="report-asset-gap">약 +1억 4,300만 원</div>
+                </div>
+
+                <div class="report-comparison-grid">
+                    <div class="comparison-box" id="report-savings-box">
+                        <div class="comparison-title">A. 은행 예적금 결과</div>
+                        <div class="comparison-cost" id="report-savings-total">8,400만 원</div>
+                        <div class="comparison-achieved" id="report-savings-achieved">버킷리스트 2개 중 1개 달성 가능</div>
+                    </div>
+                    <div class="comparison-box active-best" id="report-portfolio-box">
+                        <div class="comparison-title">B. 투자 포트폴리오 결과</div>
+                        <div class="comparison-cost" id="report-portfolio-total">2억 2,700만 원</div>
+                        <div class="comparison-achieved" id="report-portfolio-achieved">버킷리스트 2개 중 2개 모두 달성 가능!</div>
+                    </div>
+                </div>
+
+                <div class="report-tips-card">
+                    <h4>💡 라이프 밸런스 금융 가이드</h4>
+                    <ul>
+                        <li><strong>복리 효과의 마법:</strong> 수익률 연 2%와 연 6%의 차이는 작은 듯하지만, 시간이 흐를수록 자산이 기하급수적으로 불어나는 격차를 만듭니다.</li>
+                        <li><strong>인생의 수조 관리:</strong> 수입이 고정되어 있다면 현명하게 소비 카드를 조절하여 여유 자금 물길(Inflow)을 넓혀야 합니다.</li>
+                        <li><strong>투자와 위험(Risk):</strong> 높은 수익률에는 그만큼의 투자 손실 위험도 따릅니다. 따라서 은행 저축과 분산 투자를 골고루 분배하는 현명한 재무설계가 반드시 필요합니다.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="report-footer">
+                <button class="btn btn-secondary" id="btn-report-restart">🔄 다시 시뮬레이션하기</button>
+                <button class="btn btn-primary" id="btn-report-close">대시보드로 돌아가기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONFIGURATION / SETTINGS MODAL -->
+    <div class="config-modal" id="config-modal">
+        <div class="config-modal-card">
+            <div class="config-header">
+                <h3>Firebase Firestore 및 AI API 키 연동 설정</h3>
+            </div>
+            <div class="config-body">
+                <p style="font-size: 14px; color: var(--text-muted);">
+                    Firebase 실시간 동기화를 위해 Firebase Web App SDK Configuration JSON 객체를 아래에 붙여넣어 주세요. 빈 칸으로 둘 경우 브라우저 <strong>로컬 데모 모드</strong>로 연동됩니다.
+                </p>
+                <textarea id="config-firebase-json" class="config-textarea" placeholder='{
+  "apiKey": "AIzaSy...",
+  "authDomain": "...",
+  "projectId": "...",
+  "storageBucket": "...",
+  "messagingSenderId": "...",
+  "appId": "..."
+}'></textarea>
+                
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="config-gemini-key">Gemini API 키 (선택 사항 - 비용 추산 AI용)</label>
+                    <input type="password" id="config-gemini-key" class="form-input" placeholder="AI 실시간 비용 계산용 Gemini API Key (입력하지 않으면 지능형 시뮬레이터 적용)">
+                </div>
+            </div>
+            <div class="config-footer">
+                <button class="btn btn-secondary" id="btn-config-demo-mode">Offline 데모 모드로 실행</button>
+                <button class="btn btn-primary" id="btn-config-save">설정 저장 및 새로고침</button>
+            </div>
+        </div>
+    </div>
+
+    <footer style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 13px; border-top: 1px solid var(--border); margin-top: auto;">
+        © 2026 Life-Balance Simulator. 중학교 3학년(15-16세) 금융 교육 및 자산관리 모의 체험 프로그램. All rights reserved.
+    </footer>
+
+    <!-- App JavaScript Files -->
+    <script src="firebase-config.js"></script>
+    <script src="app.js"></script>
+    <script src="teacher.js"></script>
+
+</body>
+</html>
