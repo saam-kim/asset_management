@@ -1513,7 +1513,7 @@ p {
 }
 .dream-card-age {
     background: rgba(255, 255, 255, 0.08);
-    color: #38BDF8;
+    color: #F59E0B; /* 가독성 높은 주황색 */
     padding: 2px 6px;
     border-radius: var(--radius-sm);
     font-weight: 700;
@@ -1531,10 +1531,14 @@ p {
     justify-content: space-between;
     align-items: center;
     font-size: 12px;
-    color: #38BDF8;
+    color: #94A3B8; /* 라벨은 차분한 회색 */
     font-weight: 800;
     border-top: 1px dashed rgba(255, 255, 255, 0.05);
     padding-top: 6px;
+}
+.dream-card-footer span:last-child {
+    color: #FDE047; /* 금액은 쨍한 노란색으로 강조 */
+    font-size: 13.5px;
 }
 
 /* Custom Expense Items Styles */
