@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Life-Balance Simulator - 청소년 재무설계 & 자산관리 교육</title>
+    <title>꿈·돈·길 - 청소년 재무설계 & 자산관리 교육</title>
     <meta name="description" content="중학생 대상의 게임처럼 즐기는 재무설계 및 자산관리 시뮬레이션 웹 애플리케이션입니다. 생애 버킷리스트 비용 산출, 소득/지출 매칭 수조 실험, 복리 투자 효과를 레이싱 게임으로 체감해보세요!">
     
     <!-- Firebase SDK (Compat Version for Vanilla JS compatibility) -->
@@ -19,8 +19,19 @@
 
     <!-- Global App Header -->
     <header class="app-header">
-        <div class="logo" id="app-logo">
-            <span>Edu</span> Life-Balance
+        <div class="logo" id="app-logo" style="display: flex; align-items: flex-start; gap: 6px; font-family: 'Outfit', 'Noto Sans KR', sans-serif; cursor: pointer;">
+            <div style="display: flex; flex-direction: column; align-items: center; line-height: 0.9;">
+                <span style="font-size: 28px; font-weight: 900; color: var(--primary); line-height: 0.9;">꿈</span>
+                <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; line-height: 1.1; margin-top: 3px; letter-spacing: -0.02em;">
+                    <span>을</span>
+                    <span>여</span>
+                    <span>는</span>
+                </div>
+            </div>
+            <span style="font-size: 28px; font-weight: 900; color: var(--primary); line-height: 0.9;">·</span>
+            <span style="font-size: 28px; font-weight: 900; color: var(--primary); line-height: 0.9;">돈</span>
+            <span style="font-size: 28px; font-weight: 900; color: var(--primary); line-height: 0.9;">·</span>
+            <span style="font-size: 28px; font-weight: 900; color: var(--primary); line-height: 0.9;">길</span>
         </div>
         <nav class="progress-steps" id="progress-steps" style="display: none;">
             <div class="step-item active" id="step-1-indicator">
@@ -48,7 +59,7 @@
             <div class="landing-grid">
                 <div class="landing-left">
                     <span class="badge">금융 교육 시뮬레이터</span>
-                    <h1 class="landing-title">내 인생의<br>라이프 밸런스 설계</h1>
+                    <h1 class="landing-title">내 인생의<br><span style="color: var(--primary);">꿈·돈·길</span> 설계</h1>
                     <p class="landing-desc">
                         내가 꿈꾸는 미래의 삶에는 얼마가 필요할까요?<br>
                         AI 비용 추산, 현실적인 수입과 지출 관리, 그리고 은행 적금과 자산 투자의 놀라운 복리 격차를 게임처럼 재미있게 확인해 보세요.
@@ -771,7 +782,7 @@
         <div class="report-modal-card">
             <div class="report-header">
                 <h2 id="report-congrats-title">🎉 시뮬레이션 완료!</h2>
-                <p>축하합니다! 80세까지의 라이프 밸런스 결과 리포트입니다.</p>
+                <p>축하합니다! 80세까지의 꿈·돈·길 결과 리포트입니다.</p>
             </div>
             <div class="report-body">
                 <div class="report-summary-box">
@@ -817,7 +828,7 @@
                 </div>
 
                 <div class="report-tips-card">
-                    <h4>💡 라이프 밸런스 금융 가이드</h4>
+                    <h4>💡 꿈·돈·길 금융 가이드</h4>
                     <ul>
                         <li><strong>복리 효과의 마법:</strong> 수익률 연 2%와 연 6%의 차이는 작은 듯하지만, 시간이 흐를수록 자산이 기하급수적으로 불어나는 격차를 만듭니다.</li>
                         <li><strong>소득 상승(자기계발)의 힘:</strong> 매년 소득이 꾸준히 상승(연 2%~5% 인상)하면 저축 여력도 커져 은퇴 시점에 축적되는 원금이 비약적으로 많아집니다. 나 자신의 몸값(연봉)을 높이는 노력이 가장 든든한 투자 기초가 됩니다!</li>
@@ -865,7 +876,7 @@
     </div>
 
     <footer style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 13px; border-top: 1px solid var(--border); margin-top: auto;">
-        © 2026 Life-Balance Simulator. All rights reserved.
+        © 2026 꿈·돈·길. All rights reserved.
     </footer>
 
     <!-- App JavaScript Files -->

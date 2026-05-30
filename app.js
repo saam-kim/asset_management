@@ -1,4 +1,4 @@
-// Student Application Logic - Life-Balance Simulator
+// Student Application Logic - 꿈·돈·길 Simulator
 // Manages routing, audio synthesis, particle effects, UI events, AI calculations, and simulator loops.
 
 // ----------------------------------------------------
@@ -2293,7 +2293,7 @@ function downloadFinancialReport() {
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>${STATE.studentName} 학생의 생애 주기 재무 설계 보고서</title>
+    <title>${STATE.studentName} 학생의 꿈·돈·길 재무 설계 보고서</title>
     <style>
         body { font-family: 'Noto Sans KR', sans-serif; color: #1E293B; line-height: 1.6; padding: 40px; background: #F8FAFC; }
         .report-card { max-width: 800px; margin: 0 auto; background: white; border: 1px solid #E2E8F0; border-radius: 16px; padding: 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.02); }
@@ -2325,8 +2325,8 @@ function downloadFinancialReport() {
     </div>
     <div class="report-card">
         <div class="header">
-            <h1>생애 재무설계 & 자산관리 보고서</h1>
-            <p>Life-Balance Simulator - 청소년 금융교육 솔루션</p>
+            <h1>꿈·돈·길 재무설계 & 자산관리 보고서</h1>
+            <p>꿈·돈·길 - 청소년 금융교육 솔루션</p>
         </div>
 
         <div class="info-grid">
@@ -2403,7 +2403,7 @@ function downloadFinancialReport() {
 
         <div class="footer">
             본 시뮬레이션 결과는 가상의 시나리오를 바탕으로 산출된 모의 데이터이며 실제 금융 상품의 수익률을 보장하지 않습니다.<br>
-            Edu Life-Balance Simulator | 청소년 금융 교육 솔루션
+            꿈·돈·길 | 청소년 금융 교육 솔루션
         </div>
     </div>
     
