@@ -1029,7 +1029,7 @@ p {
 }
 
 .report-modal-card {
-    max-width: 650px;
+    max-width: 780px;
     width: 90%;
     background: white;
     border-radius: var(--radius-lg);
@@ -1163,6 +1163,12 @@ p {
     display: flex;
     justify-content: flex-end;
     gap: 12px;
+}
+
+.report-footer .btn {
+    padding: 12px 18px;
+    font-size: 14px;
+    white-space: nowrap;
 }
 
 /* TEACHER VIEW & DASHBOARD */

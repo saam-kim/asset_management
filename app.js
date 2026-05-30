@@ -2331,7 +2331,7 @@ function downloadFinancialReport() {
         <div class="result-box">
             <div class="result-title">💡 종합 재무 진단 및 피드백</div>
             <p style="margin: 0; font-size: 14px; line-height: 1.6;">
-                ${document.getElementById('report-status-text').innerText}
+                ${document.getElementById('report-retirement-status-text').innerText}
             </p>
         </div>
 
