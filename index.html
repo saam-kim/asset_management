@@ -528,14 +528,25 @@
                         
                         <!-- 커스텀 고정비 직접 입력 영역 -->
                         <div class="expense-group" style="margin-top: 16px; padding-top: 12px; border-top: 1px dashed var(--border);">
-                            <div class="expense-title">➕ 기타 고정 지출 직접 추가 (보험료, 통신비 등)</div>
-                            <div class="custom-expense-form" style="display: flex; gap: 8px; margin-top: 8px;">
-                                <input type="text" id="input-custom-expense-name" class="form-input" style="padding: 10px; font-size: 14px; flex: 1.5;" placeholder="예: 실손보험료, 통신요금" maxlength="15">
-                                <div style="display: flex; align-items: center; gap: 4px; flex: 1;">
-                                    <input type="number" id="input-custom-expense-cost" class="form-input" style="padding: 10px; font-size: 14px; text-align: right;" placeholder="금액" min="1" max="1000">
-                                    <span style="font-weight: 700; font-size: 14px; white-space: nowrap;">만 원</span>
+                            <div class="expense-title">➕ 기타 고정 지출 직접 추가 (보험료, 자녀 교육비 등)</div>
+                            <div class="custom-expense-form" style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+                                <!-- 첫 번째 줄: 명목 및 금액 -->
+                                <div style="display: flex; gap: 8px;">
+                                    <input type="text" id="input-custom-expense-name" class="form-input" style="padding: 10px; font-size: 14px; flex: 1.5;" placeholder="예: 자녀 학원비, 개인 실손보험" maxlength="15">
+                                    <div style="display: flex; align-items: center; gap: 4px; flex: 1;">
+                                        <input type="number" id="input-custom-expense-cost" class="form-input" style="padding: 10px; font-size: 14px; text-align: right;" placeholder="금액" min="1" max="1000">
+                                        <span style="font-weight: 700; font-size: 14px; white-space: nowrap;">만 원</span>
+                                    </div>
                                 </div>
-                                <button type="button" class="btn btn-secondary" id="btn-add-custom-expense" style="padding: 0 16px; font-size: 14px; height: auto; white-space: nowrap;">추가</button>
+                                <!-- 두 번째 줄: 연령 범위 및 추가 버튼 -->
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <span style="font-size: 13px; font-weight: 700; color: var(--text-muted); white-space: nowrap;">지출 나이 범위:</span>
+                                    <input type="number" id="input-custom-expense-start" class="form-input" style="padding: 8px; font-size: 13px; text-align: center; width: 70px;" value="20" min="20" max="80">
+                                    <span style="font-size: 13px; font-weight: 700; color: var(--text-muted);">세 ~</span>
+                                    <input type="number" id="input-custom-expense-end" class="form-input" style="padding: 8px; font-size: 13px; text-align: center; width: 70px;" value="80" min="20" max="80">
+                                    <span style="font-size: 13px; font-weight: 700; color: var(--text-muted); margin-right: auto;">세</span>
+                                    <button type="button" class="btn btn-secondary" id="btn-add-custom-expense" style="padding: 8px 16px; font-size: 13px; height: auto; white-space: nowrap;">추가</button>
+                                </div>
                             </div>
                             <div id="custom-expenses-list" style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
                                 <!-- 동적으로 추가된 커스텀 지출이 표시됨 -->

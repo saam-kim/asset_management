@@ -1211,6 +1211,8 @@ function initStage2() {
     const addBtn = document.getElementById('btn-add-custom-expense');
     const nameInput = document.getElementById('input-custom-expense-name');
     const costInput = document.getElementById('input-custom-expense-cost');
+    const startAgeInput = document.getElementById('input-custom-expense-start');
+    const endAgeInput = document.getElementById('input-custom-expense-end');
 
     const cleanAddBtn = addBtn.cloneNode(true);
     addBtn.parentNode.replaceChild(cleanAddBtn, addBtn);
@@ -1218,8 +1220,19 @@ function initStage2() {
     cleanAddBtn.addEventListener('click', () => {
         const name = nameInput.value.trim();
         const cost = parseInt(costInput.value);
+        let startAge = startAgeInput ? parseInt(startAgeInput.value) : 20;
+        let endAge = endAgeInput ? parseInt(endAgeInput.value) : 80;
+
         if (!name || isNaN(cost) || cost <= 0) {
             alert("지출 항목 이름과 올바른 금액(만 원 단위)을 입력해 주세요!");
+            return;
+        }
+
+        if (isNaN(startAge) || startAge < 20 || startAge > 80) startAge = 20;
+        if (isNaN(endAge) || endAge < 20 || endAge > 80) endAge = 80;
+
+        if (startAge > endAge) {
+            alert("시작 나이가 종료 나이보다 클 수 없습니다!");
             return;
         }
 
@@ -1227,7 +1240,9 @@ function initStage2() {
         const newItem = {
             id: 'custom_' + Date.now(),
             name: name,
-            cost: cost * 10000
+            cost: cost * 10000,
+            startAge: startAge,
+            endAge: endAge
         };
 
         if (!STATE.realityCheck.customExpenses) {
@@ -1238,6 +1253,8 @@ function initStage2() {
         // Reset Inputs
         nameInput.value = '';
         costInput.value = '';
+        if (startAgeInput) startAgeInput.value = '20';
+        if (endAgeInput) endAgeInput.value = '80';
 
         renderCustomExpenses();
         recalculateCashFlow();
@@ -1254,9 +1271,11 @@ function initStage2() {
             itemDiv.className = 'custom-expense-item';
             
             const costMan = Math.round(item.cost / 10000).toLocaleString('ko-KR');
+            const startAge = item.startAge !== undefined ? item.startAge : 20;
+            const endAge = item.endAge !== undefined ? item.endAge : 80;
             
             itemDiv.innerHTML = `
-                <span>🏷️ ${item.name} (${costMan}만 원)</span>
+                <span>🏷️ ${item.name} (${costMan}만 원) <span style="font-size: 11px; opacity: 0.8; margin-left: 6px;">| ${startAge}세~${endAge}세</span></span>
                 <button class="delete-custom-expense" data-id="${item.id}">✕</button>
             `;
 
@@ -1297,10 +1316,14 @@ function recalculateCashFlow() {
     STATE.realityCheck.selections.forEach(cardId => {
         essentialSum += EXPENSE_COSTS[cardId] || 0;
     });
-    // Add custom expenses
+    // Add custom expenses active at age 20
     if (STATE.realityCheck.customExpenses && Array.isArray(STATE.realityCheck.customExpenses)) {
         STATE.realityCheck.customExpenses.forEach(item => {
-            essentialSum += item.cost;
+            const start = item.startAge !== undefined ? item.startAge : 20;
+            const end = item.endAge !== undefined ? item.endAge : 80;
+            if (start <= 20 && end >= 20) {
+                essentialSum += item.cost;
+            }
         });
     }
     STATE.realityCheck.expenses = essentialSum;
@@ -1593,28 +1616,40 @@ function drawRacingArena(progress = 0) {
         const age = 20 + yr;
         const activeSavingsMonthly = baseSavingsMonthly * Math.pow(1 + rateGrowth, yr);
 
+        // Calculate custom expenses active at current age
+        let activeCustomExpensesCost = 0;
+        if (STATE.realityCheck.customExpenses && Array.isArray(STATE.realityCheck.customExpenses)) {
+            STATE.realityCheck.customExpenses.forEach(item => {
+                const start = item.startAge !== undefined ? item.startAge : 20;
+                const end = item.endAge !== undefined ? item.endAge : 80;
+                if (age >= start && age <= end) {
+                    activeCustomExpensesCost += item.cost;
+                }
+            });
+        }
+
         // 1. Savings Compounding (yearly deposit + interest or decumulation)
         if (yr > 0) {
             // Savings Track
             if (age <= STATE.retirement.age) {
-                currentSavings = (currentSavings + activeSavingsMonthly * 12) * (1 + rateSavings);
+                currentSavings = (currentSavings + (activeSavingsMonthly - activeCustomExpensesCost) * 12) * (1 + rateSavings);
             } else {
                 const netRetirementSpend = Math.max(0, STATE.retirement.monthlySpend - 800000);
-                currentSavings = currentSavings * (1 + rateSavings) - netRetirementSpend * 12;
+                currentSavings = currentSavings * (1 + rateSavings) - (netRetirementSpend + activeCustomExpensesCost) * 12;
             }
 
             // Portfolio Track
             if (age <= STATE.retirement.age) {
-                currentPortfolio = (currentPortfolio + activeSavingsMonthly * 12) * (1 + ratePortfolio);
+                currentPortfolio = (currentPortfolio + (activeSavingsMonthly - activeCustomExpensesCost) * 12) * (1 + ratePortfolio);
             } else {
                 const netRetirementSpend = Math.max(0, STATE.retirement.monthlySpend - 800000);
-                currentPortfolio = currentPortfolio * (1 + ratePortfolio) - netRetirementSpend * 12;
+                currentPortfolio = currentPortfolio * (1 + ratePortfolio) - (netRetirementSpend + activeCustomExpensesCost) * 12;
             }
         } else {
             // yr === 0 (20세 시점)
             if (age <= STATE.retirement.age) {
-                currentSavings = activeSavingsMonthly * 12;
-                currentPortfolio = activeSavingsMonthly * 12;
+                currentSavings = (activeSavingsMonthly - activeCustomExpensesCost) * 12;
+                currentPortfolio = (activeSavingsMonthly - activeCustomExpensesCost) * 12;
             } else {
                 currentSavings = 0;
                 currentPortfolio = 0;
@@ -2237,6 +2272,22 @@ function downloadFinancialReport() {
         `;
     }).join('');
 
+    const customListHtml = (STATE.realityCheck.customExpenses && STATE.realityCheck.customExpenses.length > 0)
+        ? STATE.realityCheck.customExpenses.map((item, idx) => {
+            const costMan = (item.cost / 10000).toLocaleString('ko-KR') + '만 원';
+            const startAge = item.startAge !== undefined ? item.startAge : 20;
+            const endAge = item.endAge !== undefined ? item.endAge : 80;
+            return `
+                <tr>
+                    <td>${idx + 1}</td>
+                    <td style="text-align: left;"><strong>${item.name}</strong></td>
+                    <td>${startAge}세 ~ ${endAge}세</td>
+                    <td style="text-align: right; font-weight: bold;">${costMan}</td>
+                </tr>
+            `;
+        }).join('')
+        : `<tr><td colspan="4" style="color: #64748B; padding: 15px;">추가된 기타 고정 지출이 없습니다.</td></tr>`;
+
     const htmlContent = `
 <!DOCTYPE html>
 <html lang="ko">
@@ -2294,9 +2345,24 @@ function downloadFinancialReport() {
             <div class="info-item">🚪 은퇴 계획 나이<strong>${STATE.retirement.age}세</strong></div>
             <div class="info-item">💸 은퇴 후 월 소비액<strong>${(STATE.retirement.monthlySpend / 10000).toLocaleString('ko-KR')}만 원</strong></div>
         </div>
-        <div style="font-size: 12px; color: #64748B; margin-top: -10px;">
+        <div style="font-size: 12px; color: #64748B; margin-top: -10px; margin-bottom: 20px;">
             * 은퇴 후 국가 복지 혜택으로 <strong>월 80만 원</strong>의 국민연금 연계 하한선 유입 혜택이 적용된 재무 설계안입니다.
         </div>
+
+        <div class="section-title">1-2. 추가 고정 지출 (기타 고정 지출)</div>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 50px;">번호</th>
+                    <th>지출 항목명</th>
+                    <th style="width: 180px;">지출 대상 연령</th>
+                    <th style="width: 150px;">월 지출액</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${customListHtml}
+            </tbody>
+        </table>
 
         <div class="section-title">2. 미래 꿈 설계 목록 (버킷리스트)</div>
         <table>

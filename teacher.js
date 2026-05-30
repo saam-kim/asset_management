@@ -592,26 +592,38 @@ function addDemoStudents() {
                     const age = 20 + y;
                     const activeSavingsMonthly = baseSavings * Math.pow(1 + rateGrowth, y);
 
+                    // Calculate custom expenses active at current age
+                    let activeCustomExpensesCost = 0;
+                    if (std.realityCheck.customExpenses && Array.isArray(std.realityCheck.customExpenses)) {
+                        std.realityCheck.customExpenses.forEach(item => {
+                            const start = item.startAge !== undefined ? item.startAge : 20;
+                            const end = item.endAge !== undefined ? item.endAge : 80;
+                            if (age >= start && age <= end) {
+                                activeCustomExpensesCost += item.cost;
+                            }
+                        });
+                    }
+
                     if (y > 0) {
                         // Savings Track
                         if (age <= retAge) {
-                            savings = (savings + activeSavingsMonthly * 12) * 1.02;
+                            savings = (savings + (activeSavingsMonthly - activeCustomExpensesCost) * 12) * 1.02;
                         } else {
                             const netSpend = Math.max(0, retSpend - 800000);
-                            savings = savings * 1.02 - netSpend * 12;
+                            savings = savings * 1.02 - (netSpend + activeCustomExpensesCost) * 12;
                         }
                         
                         // Portfolio Track
                         if (age <= retAge) {
-                            portfolio = (portfolio + activeSavingsMonthly * 12) * (1 + (std.investment.targetRate/100));
+                            portfolio = (portfolio + (activeSavingsMonthly - activeCustomExpensesCost) * 12) * (1 + (std.investment.targetRate/100));
                         } else {
                             const netSpend = Math.max(0, retSpend - 800000);
-                            portfolio = portfolio * (1 + (std.investment.targetRate/100)) - netSpend * 12;
+                            portfolio = portfolio * (1 + (std.investment.targetRate/100)) - (netSpend + activeCustomExpensesCost) * 12;
                         }
                     } else {
                         if (age <= retAge) {
-                            savings = activeSavingsMonthly * 12;
-                            portfolio = activeSavingsMonthly * 12;
+                            savings = (activeSavingsMonthly - activeCustomExpensesCost) * 12;
+                            portfolio = (activeSavingsMonthly - activeCustomExpensesCost) * 12;
                         } else {
                             savings = 0;
                             portfolio = 0;
