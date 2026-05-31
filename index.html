@@ -19,19 +19,12 @@
 
     <!-- Global App Header -->
     <header class="app-header">
-        <div class="logo" id="app-logo" style="display: flex; align-items: flex-start; gap: 6px; font-family: 'Outfit', 'Noto Sans KR', sans-serif; cursor: pointer;">
-            <div style="display: flex; flex-direction: column; align-items: center; line-height: 0.9;">
-                <span style="font-size: 28px; font-weight: 900; color: var(--primary); line-height: 0.9;">꿈</span>
-                <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; line-height: 1.1; margin-top: 3px; letter-spacing: -0.02em;">
-                    <span>을</span>
-                    <span>여</span>
-                    <span>는</span>
-                </div>
-            </div>
-            <span style="font-size: 28px; font-weight: 900; color: var(--primary); line-height: 0.9;">·</span>
-            <span style="font-size: 28px; font-weight: 900; color: var(--primary); line-height: 0.9;">돈</span>
-            <span style="font-size: 28px; font-weight: 900; color: var(--primary); line-height: 0.9;">·</span>
-            <span style="font-size: 28px; font-weight: 900; color: var(--primary); line-height: 0.9;">길</span>
+        <div class="logo" id="app-logo" style="display: flex; align-items: center; gap: 6px; font-family: 'Outfit', 'Noto Sans KR', sans-serif; cursor: pointer;">
+            <span style="font-size: 28px; font-weight: 900; color: var(--primary); padding: 0; background: none; border-radius: 0; line-height: 1.0;">꿈</span>
+            <span style="font-size: 28px; font-weight: 900; color: var(--primary); padding: 0; background: none; border-radius: 0; line-height: 1.0; margin: 0 1px;">·</span>
+            <span style="font-size: 28px; font-weight: 900; color: var(--primary); padding: 0; background: none; border-radius: 0; line-height: 1.0;">돈</span>
+            <span style="font-size: 28px; font-weight: 900; color: var(--primary); padding: 0; background: none; border-radius: 0; line-height: 1.0; margin: 0 1px;">·</span>
+            <span style="font-size: 28px; font-weight: 900; color: var(--primary); padding: 0; background: none; border-radius: 0; line-height: 1.0;">길</span>
         </div>
         <nav class="progress-steps" id="progress-steps" style="display: none;">
             <div class="step-item active" id="step-1-indicator">
@@ -59,7 +52,20 @@
             <div class="landing-grid">
                 <div class="landing-left">
                     <span class="badge">금융 교육 시뮬레이터</span>
-                    <h1 class="landing-title">내 인생의<br><span style="color: var(--primary);">꿈·돈·길</span> 설계</h1>
+                    <h1 class="landing-title main-title-container">
+                        <div class="main-title-word-col">
+                            <span class="main-title-letter">꿈</span>
+                            <div class="main-title-sub">
+                                <span>을</span>
+                                <span>여</span>
+                                <span>는</span>
+                            </div>
+                        </div>
+                        <span class="main-title-dot">·</span>
+                        <span class="main-title-letter">돈</span>
+                        <span class="main-title-dot">·</span>
+                        <span class="main-title-letter">길</span>
+                    </h1>
                     <p class="landing-desc">
                         내가 꿈꾸는 미래의 삶에는 얼마가 필요할까요?<br>
                         AI 비용 추산, 현실적인 수입과 지출 관리, 그리고 은행 적금과 자산 투자의 놀라운 복리 격차를 게임처럼 재미있게 확인해 보세요.
