@@ -24,7 +24,9 @@ function initTeacher() {
 
     // Setup complete button - generates session code and registers costs
     document.getElementById('btn-setup-complete').addEventListener('click', async () => {
-        Sound.playSuccess();
+        const completeButton = document.getElementById('btn-setup-complete');
+        completeButton.disabled = true;
+        completeButton.textContent = '세션 여는 중...';
 
         // 1. Gather all edited values from inputs (and convert to KRW)
         const customCosts = {
@@ -48,32 +50,59 @@ function initTeacher() {
         // Cache custom costs globally
         activeExpenseCosts = customCosts;
 
-        // 2. Generate session
-        currentSessionId = FirebaseSync.generateSessionId();
-        document.getElementById('teacher-session-id').innerText = currentSessionId;
-        
-        // 3. Register session
-        await FirebaseSync.createSession(currentSessionId, customCosts);
-        
-        // 4. Switch view to dashboard
-        showView('teacher-dashboard-view');
-        renderSessionShare();
-        startListeningToSession();
-    });
+        try {
+            let created = false;
+            for (let attempt = 0; attempt < 5 && !created; attempt++) {
+                currentSessionId = FirebaseSync.generateSessionId();
+                try {
+                    await FirebaseSync.createSession(currentSessionId, customCosts);
+                    created = true;
+                } catch (error) {
+                    if (!error.message.includes('이미 사용 중')) throw error;
+                }
+            }
+            if (!created) throw new Error('세션 번호를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.');
 
-    // Logout
-    document.getElementById('teacher-logout-btn').addEventListener('click', () => {
-        if (confirm("로그아웃 하시겠습니까? 세션 동기화가 중단됩니다.")) {
-            if (unsubscribeSession) unsubscribeSession();
-            location.reload();
+            document.getElementById('teacher-session-id').innerText = currentSessionId;
+            Sound.playSuccess();
+            showView('teacher-dashboard-view');
+            renderSessionShare();
+            startListeningToSession();
+        } catch (error) {
+            console.error('수업 세션 생성 실패', error);
+            alert(`수업을 열지 못했습니다. ${error.message}`);
+        } finally {
+            completeButton.disabled = false;
+            completeButton.textContent = '설정 완료 및 세션 개설';
         }
     });
 
-    // Config Panel Setup
-    initConfigurationPanel();
+    // Logout
+    document.getElementById('teacher-logout-btn').addEventListener('click', async () => {
+        if (confirm("수업을 종료하시겠습니까? 종료 후에는 학생이 새로 입장할 수 없습니다.")) {
+            const logoutButton = document.getElementById('teacher-logout-btn');
+            logoutButton.disabled = true;
+            logoutButton.textContent = '종료 중...';
+            try {
+                await FirebaseSync.closeSession(currentSessionId);
+                if (unsubscribeSession) unsubscribeSession();
+                location.reload();
+            } catch (error) {
+                console.error('수업 종료 실패', error);
+                alert(`수업을 종료하지 못했습니다. ${error.message}`);
+                logoutButton.disabled = false;
+                logoutButton.textContent = '수업 종료';
+            }
+        }
+    });
 
     // Mock students generator
-    document.getElementById('btn-add-demo-students').addEventListener('click', addDemoStudents);
+    const demoButton = document.getElementById('btn-add-demo-students');
+    if (FirebaseSync.isOfflineMode()) {
+        demoButton.addEventListener('click', addDemoStudents);
+    } else {
+        demoButton.hidden = true;
+    }
     document.getElementById('btn-copy-session-link').addEventListener('click', copyStudentSessionLink);
 }
 
@@ -109,7 +138,7 @@ function renderSessionShare() {
     const isOffline = FirebaseSync.isOfflineMode();
     syncStatus.className = `session-sync-status ${isOffline ? 'offline' : 'online'}`;
     syncStatus.textContent = isOffline
-        ? '현재 로컬 체험 모드입니다. 다른 기기의 학생 현황을 받으려면 한 번의 온라인 연결 설정이 필요합니다.'
+        ? '네트워크 연결을 확인해 주세요. 현재는 이 기기에서만 체험할 수 있습니다.'
         : '온라인 연결됨 · 학생들이 각자 기기에서 접속하면 현황이 자동으로 표시됩니다.';
 }
 
@@ -322,69 +351,6 @@ function generateWordCloud() {
             angle += 0.2 + (attempt * 0.01);
             radius += 1.8;
         }
-    });
-}
-
-// ----------------------------------------------------
-// 4. CONFIGURATION PANEL SETTINGS
-// ----------------------------------------------------
-function initConfigurationPanel() {
-    const modal = document.getElementById('config-modal');
-    const openBtn = document.getElementById('btn-open-config');
-    const saveBtn = document.getElementById('btn-config-save');
-    const demoBtn = document.getElementById('btn-config-demo-mode');
-    
-    // Read current config
-    const current = FirebaseSync.getSavedFirebaseConfig();
-    if (current) {
-        document.getElementById('config-firebase-json').value = JSON.stringify(current, null, 2);
-    }
-    
-    const geminiKey = localStorage.getItem('gemini_api_key') || '';
-    document.getElementById('config-gemini-key').value = geminiKey;
-
-    openBtn.addEventListener('click', () => {
-        modal.style.display = 'flex';
-    });
-
-    // Close on click outside card
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) modal.style.display = 'none';
-    });
-
-    saveBtn.addEventListener('click', () => {
-        const jsonVal = document.getElementById('config-firebase-json').value.trim();
-        const gemKey = document.getElementById('config-gemini-key').value.trim();
-        
-        let configObj = null;
-        if (jsonVal) {
-            try {
-                configObj = JSON.parse(jsonVal);
-            } catch (e) {
-                alert("Firebase JSON 형식이 올바르지 않습니다: " + e.message);
-                return;
-            }
-        }
-
-        FirebaseSync.saveFirebaseConfig(configObj);
-        
-        if (gemKey) {
-            localStorage.setItem('gemini_api_key', gemKey);
-        } else {
-            localStorage.removeItem('gemini_api_key');
-        }
-
-        alert("설정이 저장되었습니다. 앱을 다시 로드하여 연결합니다.");
-        modal.style.display = 'none';
-        location.reload();
-    });
-
-    demoBtn.addEventListener('click', () => {
-        FirebaseSync.saveFirebaseConfig(null);
-        localStorage.removeItem('gemini_api_key');
-        alert("Firebase 연결을 해제하고 Offline 데모 모드로 전환합니다.");
-        modal.style.display = 'none';
-        location.reload();
     });
 }
 

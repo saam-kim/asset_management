@@ -1,95 +1,102 @@
-// Firebase Configuration and Real-time Synchronization Manager
-// This file handles both Firebase Firestore connections and a robust Local Offline Demo fallback.
+// Firebase connection and classroom synchronization.
+// The public web config identifies this Firebase project; access is protected by
+// Anonymous Authentication and Firestore Security Rules.
 
-const CONFIG_KEY = 'life_balance_firebase_config';
+const DEFAULT_FIREBASE_CONFIG = Object.freeze({
+    apiKey: 'AIzaSyAl-bFkcpPvR3MLYwFP9980ArCX7mFvntY',
+    authDomain: 'dream-money-road.firebaseapp.com',
+    projectId: 'dream-money-road',
+    storageBucket: 'dream-money-road.firebasestorage.app',
+    messagingSenderId: '95702638523',
+    appId: '1:95702638523:web:ea8cbc1bee1c63d6fa6e9e'
+});
+
 const SESSION_STORAGE_KEY = 'life_balance_current_session';
 const OFFLINE_BROADCAST_NAME = 'life_balance_offline_sync';
 
 let db = null;
+let auth = null;
+let authReadyPromise = null;
 let isOfflineMode = true;
 let broadcastChannel = null;
 
-// Initialize Web BroadcastChannel for Offline Demo Sync
 if ('BroadcastChannel' in window) {
     broadcastChannel = new BroadcastChannel(OFFLINE_BROADCAST_NAME);
 }
 
-// Retrieve saved configuration
 function getSavedFirebaseConfig() {
-    try {
-        const saved = localStorage.getItem(CONFIG_KEY);
-        return saved ? JSON.parse(saved) : null;
-    } catch (e) {
-        console.error("Failed to read localStorage config", e);
-        return null;
-    }
+    return { ...DEFAULT_FIREBASE_CONFIG };
 }
 
-// Save Firebase configuration and reload
-function saveFirebaseConfig(config) {
-    try {
-        if (!config) {
-            localStorage.removeItem(CONFIG_KEY);
-        } else {
-            localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
-        }
-        return true;
-    } catch (e) {
-        console.error("Failed to save config to localStorage", e);
-        return false;
-    }
+// Kept as a no-op-compatible interface for older cached pages.
+function saveFirebaseConfig() {
+    return true;
 }
 
-// Initialize Firebase SDK if config is present
 function initializeFirebase() {
-    const config = getSavedFirebaseConfig();
-    if (config && window.firebase) {
-        try {
-            // Prevent duplicate initialization
-            if (window.firebase.apps.length === 0) {
-                window.firebase.initializeApp(config);
-            }
-            db = window.firebase.firestore();
-            isOfflineMode = false;
-            console.log("Firebase initialized successfully in Firestore mode.");
-        } catch (e) {
-            console.error("Firebase initialization failed. Falling back to Demo Mode.", e);
-            db = null;
-            isOfflineMode = true;
-        }
-    } else {
-        db = null;
+    if (!window.firebase?.firestore || !window.firebase?.auth) {
+        console.warn('Firebase SDK를 불러오지 못해 이 기기에서만 작동하는 체험 모드로 실행합니다.');
         isOfflineMode = true;
-        console.log("No Firebase config found. Running in Offline Demo Mode.");
+        return;
+    }
+
+    try {
+        if (window.firebase.apps.length === 0) {
+            window.firebase.initializeApp(DEFAULT_FIREBASE_CONFIG);
+        }
+        db = window.firebase.firestore();
+        auth = window.firebase.auth();
+        isOfflineMode = false;
+    } catch (error) {
+        console.error('Firebase 초기화 실패', error);
+        db = null;
+        auth = null;
+        isOfflineMode = true;
     }
 }
 
-// Helper to generate a unique 6-digit random PIN
+async function ensureAnonymousUser() {
+    if (isOfflineMode || !auth) return null;
+    if (auth.currentUser) return auth.currentUser;
+
+    if (!authReadyPromise) {
+        authReadyPromise = auth.signInAnonymously()
+            .then((credential) => credential.user)
+            .catch((error) => {
+                authReadyPromise = null;
+                throw new Error(`온라인 수업 연결에 실패했습니다. (${error.code || error.message})`);
+            });
+    }
+    return authReadyPromise;
+}
+
 function generateSessionId() {
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// Create a session (Teacher)
 async function createSession(sessionId, expenseCosts = null) {
     if (!isOfflineMode && db) {
-        try {
-            await db.collection('sessions').doc(sessionId).set({
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                status: 'active',
-                expenseCosts: expenseCosts
-            });
-            return true;
-        } catch (e) {
-            console.error("Failed to create Firestore session", e);
+        const user = await ensureAnonymousUser();
+        const sessionRef = db.collection('sessions').doc(sessionId);
+        const existing = await sessionRef.get();
+        if (existing.exists) {
+            throw new Error('같은 세션 번호가 이미 사용 중입니다. 다시 시도해 주세요.');
         }
+
+        await sessionRef.set({
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            teacherUid: user.uid,
+            status: 'active',
+            expenseCosts
+        });
+        return true;
     }
-    
-    // Offline / Fallback local tracking
+
     sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
         sessionId,
         role: 'teacher',
         createdAt: Date.now(),
-        expenseCosts: expenseCosts
+        expenseCosts
     }));
     if (expenseCosts) {
         localStorage.setItem(`offline_session_costs_${sessionId}`, JSON.stringify(expenseCosts));
@@ -97,9 +104,20 @@ async function createSession(sessionId, expenseCosts = null) {
     return true;
 }
 
-// Join a session (Student)
-async function joinSession(sessionId, studentId, studentName) {
-    const studentData = {
+async function closeSession(sessionId) {
+    if (!sessionId) return true;
+    if (!isOfflineMode && db) {
+        await ensureAnonymousUser();
+        await db.collection('sessions').doc(sessionId).update({
+            status: 'ended',
+            endedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    }
+    return true;
+}
+
+async function joinSession(sessionId, fallbackStudentId, studentName) {
+    const baseStudentData = {
         name: studentName,
         stage: 1,
         updatedAt: Date.now(),
@@ -109,72 +127,72 @@ async function joinSession(sessionId, studentId, studentName) {
     };
 
     if (!isOfflineMode && db) {
-        try {
-            const sessionDoc = await db.collection('sessions').doc(sessionId).get();
-            if (!sessionDoc.exists) {
-                throw new Error("존재하지 않는 세션 번호입니다.");
-            }
-            const sessionData = sessionDoc.data();
-            
-            await db.collection('sessions').doc(sessionId)
-                .collection('students').doc(studentId).set(studentData);
-                
-            return sessionData.expenseCosts || null;
-        } catch (e) {
-            console.error("Failed to join Firestore session", e);
-            throw e;
+        const user = await ensureAnonymousUser();
+        const sessionRef = db.collection('sessions').doc(sessionId);
+        const sessionDoc = await sessionRef.get();
+        if (!sessionDoc.exists || sessionDoc.data().status !== 'active') {
+            throw new Error('존재하지 않거나 종료된 세션 번호입니다.');
         }
+
+        const studentId = user.uid;
+        const studentRef = sessionRef.collection('students').doc(studentId);
+        const existing = await studentRef.get();
+        if (existing.exists) {
+            await studentRef.update({
+                name: studentName,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } else {
+            await studentRef.set({
+                ...baseStudentData,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+
+        return {
+            expenseCosts: sessionDoc.data().expenseCosts || null,
+            studentId
+        };
     }
 
-    // Offline / Fallback local tracking
+    const studentId = fallbackStudentId;
     if (broadcastChannel) {
         broadcastChannel.postMessage({
             type: 'student_join',
             sessionId,
             studentId,
             studentName,
-            data: studentData
+            data: baseStudentData
         });
     }
-    
-    // Fetch offline costs
+
     try {
         const cachedCosts = localStorage.getItem(`offline_session_costs_${sessionId}`);
-        return cachedCosts ? JSON.parse(cachedCosts) : null;
-    } catch (e) {
-        return null;
+        return {
+            expenseCosts: cachedCosts ? JSON.parse(cachedCosts) : null,
+            studentId
+        };
+    } catch (error) {
+        return { expenseCosts: null, studentId };
     }
 }
 
-// Update student data (Student)
 async function updateStudentData(sessionId, studentId, stage, fields) {
     if (!isOfflineMode && db) {
-        try {
-            const updates = {
-                stage: stage,
+        await ensureAnonymousUser();
+        await db.collection('sessions').doc(sessionId)
+            .collection('students').doc(studentId).update({
+                stage,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                 ...fields
-            };
-            await db.collection('sessions').doc(sessionId)
-                .collection('students').doc(studentId).update(updates);
-            return true;
-        } catch (e) {
-            console.error("Failed to update Firestore student data", e);
-        }
+            });
+        return true;
     }
 
-    // Offline / Fallback local tracking
     if (broadcastChannel) {
-        broadcastChannel.postMessage({
-            type: 'student_update',
-            sessionId,
-            studentId,
-            stage,
-            fields
-        });
+        broadcastChannel.postMessage({ type: 'student_update', sessionId, studentId, stage, fields });
     }
-    
-    // Save to local storage for double safety
+
     const localKey = `offline_student_${sessionId}_${studentId}`;
     const current = localStorage.getItem(localKey);
     const existing = current ? JSON.parse(current) : { name: 'Unknown', stage: 1 };
@@ -184,14 +202,11 @@ async function updateStudentData(sessionId, studentId, stage, fields) {
         updatedAt: Date.now(),
         ...fields
     }));
-
     return true;
 }
 
-// Listen to a session (Teacher Dashboard)
 function listenToSession(sessionId, onUpdate) {
     if (!isOfflineMode && db) {
-        // Return unsubscribe function
         return db.collection('sessions').doc(sessionId)
             .collection('students').onSnapshot((snapshot) => {
                 const students = {};
@@ -200,63 +215,49 @@ function listenToSession(sessionId, onUpdate) {
                 });
                 onUpdate(students);
             }, (error) => {
-                console.error("Firestore snapshot error", error);
+                console.error('학생 현황 동기화 실패', error);
             });
     }
 
-    // Local Storage & Broadcast Channel Offline Listening
     const localStudents = {};
-    
-    // Load existing items from localStorage
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key.startsWith(`offline_student_${sessionId}_`)) {
             const studentId = key.replace(`offline_student_${sessionId}_`, '');
             try {
                 localStudents[studentId] = JSON.parse(localStorage.getItem(key));
-            } catch (e) {}
+            } catch (error) {
+                console.warn('로컬 학생 데이터를 읽지 못했습니다.', error);
+            }
         }
     }
-    
-    // Trigger initial render
     onUpdate(localStudents);
 
-    // Listen to live broadcast events
     const handleBroadcast = (event) => {
         const msg = event.data;
         if (msg.sessionId !== sessionId) return;
 
         if (msg.type === 'student_join') {
             localStudents[msg.studentId] = msg.data;
-            onUpdate({ ...localStudents });
         } else if (msg.type === 'student_update') {
-            const current = localStudents[msg.studentId] || {};
             localStudents[msg.studentId] = {
-                ...current,
+                ...(localStudents[msg.studentId] || {}),
                 stage: msg.stage,
                 ...msg.fields,
                 updatedAt: Date.now()
             };
-            onUpdate({ ...localStudents });
+        } else {
+            return;
         }
+        onUpdate({ ...localStudents });
     };
 
-    if (broadcastChannel) {
-        broadcastChannel.addEventListener('message', handleBroadcast);
-    }
-
-    // Subscriptions cleanup
-    return () => {
-        if (broadcastChannel) {
-            broadcastChannel.removeEventListener('message', handleBroadcast);
-        }
-    };
+    broadcastChannel?.addEventListener('message', handleBroadcast);
+    return () => broadcastChannel?.removeEventListener('message', handleBroadcast);
 }
 
-// Run initial configurations
 initializeFirebase();
 
-// Export interfaces globally
 window.FirebaseSync = {
     getSavedFirebaseConfig,
     saveFirebaseConfig,
@@ -264,6 +265,7 @@ window.FirebaseSync = {
     isOfflineMode: () => isOfflineMode,
     generateSessionId,
     createSession,
+    closeSession,
     joinSession,
     updateStudentData,
     listenToSession

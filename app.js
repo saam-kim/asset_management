@@ -497,8 +497,6 @@ async function runAIEstimation() {
     let finalTip = "";
     let finalBreakdown = null;
     
-    // Check if configuration exists
-    const config = FirebaseSync.getSavedFirebaseConfig();
     const geminiKey = document.getElementById('config-gemini-key')?.value || localStorage.getItem('gemini_api_key');
     
     if (geminiKey) {
@@ -1558,7 +1556,8 @@ function syncStudentDataToBackend(isCompleted = false) {
     };
 
     const finalStage = isCompleted ? 3 : STATE.currentStage;
-    FirebaseSync.updateStudentData(STATE.sessionId, STATE.studentId, finalStage, updates);
+    FirebaseSync.updateStudentData(STATE.sessionId, STATE.studentId, finalStage, updates)
+        .catch((error) => console.error('진행 상황 저장 실패', error));
 }
 
 // ----------------------------------------------------
@@ -1601,10 +1600,11 @@ function initApp() {
         document.getElementById('student-join-submit').innerText = "접속 중...";
 
         try {
-            const studentId = 'student_' + Math.random().toString(36).substr(2, 9);
+            const fallbackStudentId = 'student_' + Math.random().toString(36).substr(2, 9);
             
             // Try connection
-            const customCosts = await FirebaseSync.joinSession(pinVal, studentId, nameVal);
+            const joinResult = await FirebaseSync.joinSession(pinVal, fallbackStudentId, nameVal);
+            const customCosts = joinResult.expenseCosts;
             
             if (customCosts) {
                 // Override local EXPENSE_COSTS
@@ -1613,7 +1613,7 @@ function initApp() {
             
             // Set states
             STATE.sessionId = pinVal;
-            STATE.studentId = studentId;
+            STATE.studentId = joinResult.studentId;
             STATE.studentName = nameVal;
 
             document.getElementById('user-display').innerText = `👤 ${nameVal} 학생 (세션: ${pinVal})`;

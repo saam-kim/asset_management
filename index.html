@@ -8,6 +8,7 @@
     
     <!-- Firebase SDK (Compat Version for Vanilla JS compatibility) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     
     <link rel="stylesheet" href="style.css">
@@ -210,9 +211,6 @@
                     </button>
                 </div>
                 <div style="display: flex; gap: 12px;">
-                    <button class="btn btn-secondary" id="btn-open-config" style="padding: 10px 18px; font-size: 14px;">
-                        ⚙️ 온라인 연결 설정
-                    </button>
                     <button class="btn btn-danger" id="teacher-logout-btn" style="padding: 10px 18px; font-size: 14px;">
                         수업 종료
                     </button>
@@ -693,37 +691,6 @@
             <div class="report-footer">
                 <button class="btn btn-secondary" id="btn-report-restart">🔄 다시 시뮬레이션하기</button>
                 <button class="btn btn-primary" id="btn-report-close">대시보드로 돌아가기</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- CONFIGURATION / SETTINGS MODAL -->
-    <div class="config-modal" id="config-modal">
-        <div class="config-modal-card">
-            <div class="config-header">
-                <h3>Firebase Firestore 및 AI API 키 연동 설정</h3>
-            </div>
-            <div class="config-body">
-                <p style="font-size: 14px; color: var(--text-muted);">
-                    Firebase 실시간 동기화를 위해 Firebase Web App SDK Configuration JSON 객체를 아래에 붙여넣어 주세요. 빈 칸으로 둘 경우 브라우저 <strong>로컬 데모 모드</strong>로 연동됩니다.
-                </p>
-                <textarea id="config-firebase-json" class="config-textarea" placeholder='{
-  "apiKey": "AIzaSy...",
-  "authDomain": "...",
-  "projectId": "...",
-  "storageBucket": "...",
-  "messagingSenderId": "...",
-  "appId": "..."
-}'></textarea>
-                
-                <div class="form-group" style="margin-bottom: 0;">
-                    <label for="config-gemini-key">Gemini API 키 (선택 사항 - 비용 추산 AI용)</label>
-                    <input type="password" id="config-gemini-key" class="form-input" placeholder="AI 실시간 비용 계산용 Gemini API Key (입력하지 않으면 지능형 시뮬레이터 적용)">
-                </div>
-            </div>
-            <div class="config-footer">
-                <button class="btn btn-secondary" id="btn-config-demo-mode">Offline 데모 모드로 실행</button>
-                <button class="btn btn-primary" id="btn-config-save">설정 저장 및 새로고침</button>
             </div>
         </div>
     </div>
