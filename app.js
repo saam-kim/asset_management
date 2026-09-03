@@ -1,6 +1,10 @@
 // Student Application Logic - Life-Balance Simulator
 // Manages routing, audio synthesis, particle effects, UI events, AI calculations, and simulator loops.
 
+const INVESTMENT_START_AGE = 25;
+const INVESTMENT_END_AGE = 60;
+const INVESTMENT_YEARS = INVESTMENT_END_AGE - INVESTMENT_START_AGE;
+
 // ----------------------------------------------------
 // 1. STATE MANAGEMENT
 // ----------------------------------------------------
@@ -1145,7 +1149,21 @@ let racingCanvas = null;
 let racingCtx = null;
 let racingAnimationId = null;
 let racingProgress = 0; // 0 to 1
-let racingAge = 20;
+
+function calculateInvestmentSeries(monthlyContribution, annualRate, years = INVESTMENT_YEARS) {
+    const monthlyRate = Math.pow(1 + annualRate, 1 / 12) - 1;
+    const balances = [0];
+    let balance = 0;
+
+    for (let year = 1; year <= years; year++) {
+        for (let month = 0; month < 12; month++) {
+            balance = balance * (1 + monthlyRate) + monthlyContribution;
+        }
+        balances.push(balance);
+    }
+
+    return balances;
+}
 
 function initStage3() {
     racingCanvas = document.getElementById('racing-graph-canvas');
@@ -1215,9 +1233,10 @@ function drawRacingArena(progress = 0) {
     // Axis Labels
     racingCtx.fillStyle = '#94A3B8';
     racingCtx.font = '11px Outfit, sans-serif';
-    racingCtx.fillText('20세', 40, height - 20);
-    racingCtx.fillText('40세', (width - 70) / 2 + 50, height - 20);
-    racingCtx.fillText('60세', width - 50, height - 20);
+    const middleAge = Math.round((INVESTMENT_START_AGE + INVESTMENT_END_AGE) / 2);
+    racingCtx.fillText(`${INVESTMENT_START_AGE}세`, 40, height - 20);
+    racingCtx.fillText(`${middleAge}세`, (width - 70) / 2 + 50, height - 20);
+    racingCtx.fillText(`${INVESTMENT_END_AGE}세`, width - 50, height - 20);
 
     // Simulation computations
     // Simulation computations
@@ -1235,31 +1254,19 @@ function drawRacingArena(progress = 0) {
         return;
     }
 
-    const years = 40;
-    const pointsSavings = [];
-    const pointsPortfolio = [];
-
-    let currentSavings = 0;
-    let currentPortfolio = 0;
-
+    const years = INVESTMENT_YEARS;
     const rateSavings = 0.02; // Fixed 2%
     const ratePortfolio = STATE.investment.targetRate / 100;
-
-    // Create points lists year by year
-    for (let yr = 0; yr <= years; yr++) {
-        // Savings compounding
-        if (yr > 0) {
-            currentSavings = (currentSavings + baseSavingsMonthly * 12) * (1 + rateSavings);
-            currentPortfolio = (currentPortfolio + baseSavingsMonthly * 12) * (1 + ratePortfolio);
-        } else {
-            currentSavings = baseSavingsMonthly * 12;
-            currentPortfolio = baseSavingsMonthly * 12;
-        }
-        
+    const savingsSeries = calculateInvestmentSeries(baseSavingsMonthly, rateSavings, years);
+    const portfolioSeries = calculateInvestmentSeries(baseSavingsMonthly, ratePortfolio, years);
+    const pointsSavings = savingsSeries.map((value, yr) => {
         const xPos = 50 + (yr / years) * (width - 100);
-        pointsSavings.push({ x: xPos, y: currentSavings, val: currentSavings });
-        pointsPortfolio.push({ x: xPos, y: currentPortfolio, val: currentPortfolio });
-    }
+        return { x: xPos, y: value, val: value };
+    });
+    const pointsPortfolio = portfolioSeries.map((value, yr) => {
+        const xPos = 50 + (yr / years) * (width - 100);
+        return { x: xPos, y: value, val: value };
+    });
 
     // Determine scale based on maximum portfolio value at 60
     const maxVal = Math.max(10000000, pointsPortfolio[pointsPortfolio.length - 1].y);
@@ -1270,7 +1277,7 @@ function drawRacingArena(progress = 0) {
     const activeSavingsVal = pointsSavings[activeIdx]?.val || 0;
     const activePortfolioVal = pointsPortfolio[activeIdx]?.val || 0;
     
-    document.getElementById('racing-age-val').innerText = 20 + activeIdx;
+    document.getElementById('racing-age-val').innerText = INVESTMENT_START_AGE + activeIdx;
     document.getElementById('racing-savings-val').innerText = `${Math.round(activeSavingsVal / 10000).toLocaleString('ko-KR')}만 원`;
     document.getElementById('racing-portfolio-val').innerText = `${Math.round(activePortfolioVal / 10000).toLocaleString('ko-KR')}만 원`;
 
@@ -1404,17 +1411,13 @@ function startRacingSimulation() {
 function finishRacingSimulation() {
     // 1. Calculate totals at age 60
     const baseSavingsMonthly = STATE.realityCheck.dreamSaving;
-    const years = 40;
+    const years = INVESTMENT_YEARS;
     const rateSavings = 0.02;
     const ratePortfolio = STATE.investment.targetRate / 100;
-    
-    let endSavings = 0;
-    let endPortfolio = 0;
-    
-    for (let yr = 1; yr <= years; yr++) {
-        endSavings = (endSavings + baseSavingsMonthly * 12) * (1 + rateSavings);
-        endPortfolio = (endPortfolio + baseSavingsMonthly * 12) * (1 + ratePortfolio);
-    }
+    const savingsSeries = calculateInvestmentSeries(baseSavingsMonthly, rateSavings, years);
+    const portfolioSeries = calculateInvestmentSeries(baseSavingsMonthly, ratePortfolio, years);
+    const endSavings = savingsSeries[savingsSeries.length - 1];
+    const endPortfolio = portfolioSeries[portfolioSeries.length - 1];
 
     STATE.investment.savingsEnd = Math.round(endSavings);
     STATE.investment.portfolioEnd = Math.round(endPortfolio);

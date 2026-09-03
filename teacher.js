@@ -358,6 +358,7 @@ function addDemoStudents() {
     if (!currentSessionId) return;
 
     const names = ["김영희", "이민수", "박지선", "최우재", "정은우"];
+    const studentIds = names.map((_, idx) => `demo_std_${idx}_${Math.floor(Math.random() * 1000)}`);
     const presetsStage1 = [
         [{ category: "travel", text: "스위스 한 달 살기", cost: 8000000, ageGroup: "20s" }, { category: "tech", text: "아이패드 프로", cost: 1800000, ageGroup: "20s" }],
         [{ category: "housing", text: "내 집 마련 계약금", cost: 80000000, ageGroup: "30s" }, { category: "car", text: "첫 중고 경차", cost: 8000000, ageGroup: "20s" }],
@@ -374,7 +375,7 @@ function addDemoStudents() {
     };
 
     names.forEach((name, idx) => {
-        const studentId = `demo_std_${idx}_${Math.floor(Math.random()*1000)}`;
+        const studentId = studentIds[idx];
         
         // Calculate fixed expenses sum
         const selections = ["meal_out", "house_rent", "trans_public", "hobby_basic"];
@@ -437,7 +438,7 @@ function addDemoStudents() {
     const progressTimer = setInterval(() => {
         timeStep++;
         names.forEach((name, idx) => {
-            const studentId = `demo_std_${idx}`;
+            const studentId = studentIds[idx];
             // Randomly update stages of demo students
             let targetStage = 1;
             if (timeStep === 1) targetStage = 2; // move to stage 2
@@ -453,13 +454,10 @@ function addDemoStudents() {
             if (targetStage === 3) {
                 // compute fake simulation values using dreamSaving
                 const baseSavings = std.realityCheck.dreamSaving;
-                const years = 40;
-                let savings = 0;
-                let portfolio = 0;
-                for(let y=1; y<=years; y++) {
-                    savings = (savings + baseSavings * 12) * 1.02;
-                    portfolio = (portfolio + baseSavings * 12) * (1 + (std.investment.targetRate/100));
-                }
+                const savingsSeries = calculateInvestmentSeries(baseSavings, 0.02);
+                const portfolioSeries = calculateInvestmentSeries(baseSavings, std.investment.targetRate / 100);
+                const savings = savingsSeries[savingsSeries.length - 1];
+                const portfolio = portfolioSeries[portfolioSeries.length - 1];
                 std.investment.savingsEnd = Math.round(savings);
                 std.investment.portfolioEnd = Math.round(portfolio);
                 std.investment.bucketListCount = std.bucketList.length;
