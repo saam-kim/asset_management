@@ -764,6 +764,32 @@ p {
     gap: 20px;
 }
 
+.reality-rule,
+.simulation-assumptions {
+    border: 1px solid #BFDBFE;
+    background: #EFF6FF;
+    color: #1E3A8A;
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.simulation-assumptions {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.readiness-message {
+    min-height: 20px;
+    margin-top: 8px;
+    text-align: center;
+    color: var(--danger);
+    font-size: 13px;
+    font-weight: 700;
+}
+
 .expense-group {
     display: flex;
     flex-direction: column;
@@ -887,6 +913,7 @@ p {
 .metric-inflow { background: var(--primary-light); color: var(--primary); }
 .metric-outflow { background: #FFF7ED; color: var(--warning); }
 .metric-net { border: 1px solid var(--border); }
+.metric-emergency { background: #F1F5F9; color: #475569; }
 
 .net-positive { color: var(--success); }
 .net-negative { color: var(--danger); animation: shake 0.5s ease; }
@@ -1207,6 +1234,74 @@ p {
     border-radius: var(--radius-md);
 }
 
+.session-share-card {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 28px;
+    margin-bottom: 24px;
+    padding: 24px 28px;
+}
+
+.session-qr-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: var(--text);
+    font-size: 14px;
+}
+
+#session-qr-code {
+    width: 184px;
+    min-height: 184px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    font-size: 12px;
+    text-align: center;
+}
+
+#session-qr-code img,
+#session-qr-code canvas {
+    display: block;
+}
+
+.session-share-info {
+    min-width: 0;
+}
+
+.session-share-info h2 {
+    margin: 10px 0 14px;
+}
+
+.session-link-row {
+    display: flex;
+    gap: 10px;
+}
+
+.session-link-row .form-input {
+    min-width: 0;
+}
+
+.session-link-row .btn {
+    flex: 0 0 auto;
+}
+
+.session-sync-status {
+    margin-top: 10px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.session-sync-status.online { color: var(--success); }
+.session-sync-status.offline { color: #B45309; }
+
 .teacher-student-panel {
     display: flex;
     flex-direction: column;
@@ -1430,6 +1525,14 @@ p {
     
     .dream-layout, .reality-layout, .teacher-grid {
         grid-template-columns: 1fr;
+    }
+
+    .session-share-card {
+        grid-template-columns: 1fr;
+    }
+
+    .session-link-row {
+        flex-direction: column;
     }
     
     .invest-split {

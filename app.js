@@ -4,6 +4,9 @@
 const INVESTMENT_START_AGE = 25;
 const INVESTMENT_END_AGE = 60;
 const INVESTMENT_YEARS = INVESTMENT_END_AGE - INVESTMENT_START_AGE;
+const INFLATION_RATE = 0.02;
+const PORTFOLIO_VOLATILITY = 0.12;
+const REQUIRED_EXPENSE_TYPES = ['meal', 'housing', 'transport', 'hobby'];
 
 // ----------------------------------------------------
 // 1. STATE MANAGEMENT
@@ -889,6 +892,12 @@ let waterHeight = 0.5; // current visual water height (0 to 1)
 let targetWaterHeight = 0.5;
 let waveOffset = 0;
 
+function getGoalHorizonMonths(ageGroup) {
+    if (ageGroup === '30s') return 180;
+    if (ageGroup === '40s') return 360;
+    return 60;
+}
+
 function initStage2() {
     updateDOMCardCosts();
     
@@ -922,11 +931,9 @@ function initStage2() {
     // 1. Calculate recommended monthly savings for dreams
     let monthlyBucketSaving = 0;
     STATE.bucketList.forEach(item => {
-        let months = 60; // 20s
-        if (item.ageGroup === '30s') months = 180;
-        else if (item.ageGroup === '40s') months = 360;
-        
-        monthlyBucketSaving += (item.cost / months);
+        const months = getGoalHorizonMonths(item.ageGroup);
+        const inflationAdjustedCost = item.cost * Math.pow(1 + INFLATION_RATE, months / 12);
+        monthlyBucketSaving += inflationAdjustedCost / months;
     });
     STATE.realityCheck.recommendedSaving = Math.round(monthlyBucketSaving);
 
@@ -940,7 +947,7 @@ function initStage2() {
 
     const recommendText = document.getElementById('dream-saving-recommend-text');
     const recMan = Math.round(STATE.realityCheck.recommendedSaving / 10000);
-    recommendText.innerText = `* 버킷리스트 달성을 위한 권장 최소 저축액: ${recMan.toLocaleString('ko-KR')}만 원 / 월`;
+    recommendText.innerText = `* 연 2% 물가상승을 반영한 목표 적립 권장액: ${recMan.toLocaleString('ko-KR')}만 원 / 월`;
 
     // 3. Bind dream saving slider input
     let lastDreamTickVal = STATE.realityCheck.dreamSaving;
@@ -959,6 +966,20 @@ function initStage2() {
 
     // Select expenses cards (Toggles & Multi-select across groups)
     const cards = document.querySelectorAll('.expense-card');
+    const cardTypeById = new Map([...cards].map(card => [card.dataset.id, card.dataset.type]));
+    const selectedByType = new Map();
+    STATE.realityCheck.selections.forEach(id => {
+        const type = cardTypeById.get(id);
+        if (type && !selectedByType.has(type)) selectedByType.set(type, id);
+    });
+    REQUIRED_EXPENSE_TYPES.forEach(type => {
+        if (!selectedByType.has(type)) {
+            const defaultCard = document.querySelector(`.expense-card[data-type="${type}"]`);
+            if (defaultCard) selectedByType.set(type, defaultCard.dataset.id);
+        }
+    });
+    STATE.realityCheck.selections = [...selectedByType.values()];
+
     cards.forEach(card => {
         // Remove clone to prevent duplicate events
         const cleanCard = card.cloneNode(true);
@@ -975,17 +996,12 @@ function initStage2() {
 
         cleanCard.addEventListener('click', () => {
             Sound.playSelect();
-            
-            const idx = STATE.realityCheck.selections.indexOf(cardId);
-            if (idx > -1) {
-                // Already active: deactivate (toggle off)
-                STATE.realityCheck.selections.splice(idx, 1);
-                cleanCard.classList.remove('active');
-            } else {
-                // Inactive: activate (toggle on)
-                STATE.realityCheck.selections.push(cardId);
-                cleanCard.classList.add('active');
-            }
+            const type = cleanCard.dataset.type;
+            document.querySelectorAll(`.expense-card[data-type="${type}"]`).forEach(typeCard => {
+                typeCard.classList.toggle('active', typeCard.dataset.id === cardId);
+            });
+            STATE.realityCheck.selections = STATE.realityCheck.selections.filter(id => cardTypeById.get(id) !== type);
+            STATE.realityCheck.selections.push(cardId);
             
             recalculateCashFlow();
         });
@@ -999,11 +1015,11 @@ function initStage2() {
     animateWaterTank();
 
     // Stage 3 action triggers
-    document.getElementById('btn-go-stage3').addEventListener('click', () => {
+    document.getElementById('btn-go-stage3').onclick = () => {
         Sound.playSelect();
         showView('student-stage3-view');
         initStage3();
-    });
+    };
 }
 
 function recalculateCashFlow() {
@@ -1017,10 +1033,12 @@ function recalculateCashFlow() {
     // Total monthly outflow = Essential fixed consumption + Configured Dream Savings
     const totalOutflow = Math.round(essentialSum + STATE.realityCheck.dreamSaving);
     const netCashFlow = STATE.realityCheck.income - totalOutflow;
+    const emergencyFundTarget = essentialSum * 3;
 
     // Render Metrics Text
     document.getElementById('metric-inflow-val').innerText = `+${STATE.realityCheck.income.toLocaleString('ko-KR')}원`;
     document.getElementById('metric-outflow-val').innerText = `-${totalOutflow.toLocaleString('ko-KR')}원`;
+    document.getElementById('metric-emergency-val').innerText = `${emergencyFundTarget.toLocaleString('ko-KR')}원`;
     
     const netValDiv = document.getElementById('metric-net-val');
     const netRow = document.getElementById('metric-net-row');
@@ -1047,6 +1065,14 @@ function recalculateCashFlow() {
         const ratio = Math.abs(netCashFlow) / STATE.realityCheck.income;
         targetWaterHeight = Math.max(0.25 - ratio * 0.25, 0.05);
     }
+
+    const stage3Button = document.getElementById('btn-go-stage3');
+    const readinessMessage = document.getElementById('stage3-readiness-message');
+    const canInvest = STATE.realityCheck.dreamSaving > 0 && netCashFlow >= 0;
+    stage3Button.disabled = !canInvest;
+    readinessMessage.innerText = canInvest
+        ? ''
+        : '월 적자를 없애고 5만 원 이상을 목표 적립액으로 설정해야 다음 단계로 갈 수 있습니다.';
 
     // Sync state updates
     syncStudentDataToBackend();
@@ -1165,6 +1191,45 @@ function calculateInvestmentSeries(monthlyContribution, annualRate, years = INVE
     return balances;
 }
 
+function createSeededRandom(seed) {
+    let value = seed >>> 0;
+    return () => {
+        value += 0x6D2B79F5;
+        let result = value;
+        result = Math.imul(result ^ (result >>> 15), result | 1);
+        result ^= result + Math.imul(result ^ (result >>> 7), result | 61);
+        return ((result ^ (result >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+function calculateVolatileInvestmentSeries(monthlyContribution, expectedAnnualRate, years = INVESTMENT_YEARS) {
+    // Keep the same market shocks for every selected expected return so comparisons stay fair.
+    const random = createSeededRandom(25060);
+    const balances = [0];
+    const shocks = [];
+    let balance = 0;
+
+    for (let year = 1; year <= years; year++) {
+        const u1 = Math.max(random(), Number.EPSILON);
+        const u2 = random();
+        shocks.push(Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2));
+    }
+    const averageShock = shocks.reduce((sum, shock) => sum + shock, 0) / shocks.length;
+
+    shocks.forEach(shock => {
+        const centeredShock = shock - averageShock;
+        const annualReturn = Math.max(-0.35, Math.min(0.35, expectedAnnualRate + centeredShock * PORTFOLIO_VOLATILITY));
+        const monthlyRate = Math.pow(1 + annualReturn, 1 / 12) - 1;
+
+        for (let month = 0; month < 12; month++) {
+            balance = balance * (1 + monthlyRate) + monthlyContribution;
+        }
+        balances.push(balance);
+    });
+
+    return balances;
+}
+
 function initStage3() {
     racingCanvas = document.getElementById('racing-graph-canvas');
     racingCtx = racingCanvas.getContext('2d');
@@ -1179,16 +1244,17 @@ function initStage3() {
     rateRange.value = STATE.investment.targetRate;
     document.getElementById('investment-rate-val').innerText = `연 ${STATE.investment.targetRate.toFixed(1)}%`;
     
-    rateRange.addEventListener('input', (e) => {
+    rateRange.oninput = (e) => {
         const rate = parseFloat(e.target.value);
         STATE.investment.targetRate = rate;
         document.getElementById('investment-rate-val').innerText = `연 ${rate.toFixed(1)}%`;
         Sound.playTick();
-    });
+        drawRacingArena(0);
+    };
 
     // Start racing simulation button click
     const startBtn = document.getElementById('btn-start-simulation');
-    startBtn.addEventListener('click', startRacingSimulation);
+    startBtn.onclick = startRacingSimulation;
 
     // Initial reset render
     drawRacingArena(0);
@@ -1239,7 +1305,6 @@ function drawRacingArena(progress = 0) {
     racingCtx.fillText(`${INVESTMENT_END_AGE}세`, width - 50, height - 20);
 
     // Simulation computations
-    // Simulation computations
     const baseSavingsMonthly = STATE.realityCheck.dreamSaving;
     const netCashFlow = STATE.realityCheck.income - STATE.realityCheck.expenses - STATE.realityCheck.dreamSaving;
     if (baseSavingsMonthly <= 0 || netCashFlow < 0) {
@@ -1258,7 +1323,7 @@ function drawRacingArena(progress = 0) {
     const rateSavings = 0.02; // Fixed 2%
     const ratePortfolio = STATE.investment.targetRate / 100;
     const savingsSeries = calculateInvestmentSeries(baseSavingsMonthly, rateSavings, years);
-    const portfolioSeries = calculateInvestmentSeries(baseSavingsMonthly, ratePortfolio, years);
+    const portfolioSeries = calculateVolatileInvestmentSeries(baseSavingsMonthly, ratePortfolio, years);
     const pointsSavings = savingsSeries.map((value, yr) => {
         const xPos = 50 + (yr / years) * (width - 100);
         return { x: xPos, y: value, val: value };
@@ -1268,8 +1333,12 @@ function drawRacingArena(progress = 0) {
         return { x: xPos, y: value, val: value };
     });
 
-    // Determine scale based on maximum portfolio value at 60
-    const maxVal = Math.max(10000000, pointsPortfolio[pointsPortfolio.length - 1].y);
+    // Fit both paths, including temporary peaks and drawdowns, inside the chart.
+    const maxVal = Math.max(
+        10000000,
+        ...pointsSavings.map(point => point.y),
+        ...pointsPortfolio.map(point => point.y)
+    );
     const scaleY = (height - 80) / maxVal;
 
     // Update real-time metric panel tags
@@ -1415,57 +1484,32 @@ function finishRacingSimulation() {
     const rateSavings = 0.02;
     const ratePortfolio = STATE.investment.targetRate / 100;
     const savingsSeries = calculateInvestmentSeries(baseSavingsMonthly, rateSavings, years);
-    const portfolioSeries = calculateInvestmentSeries(baseSavingsMonthly, ratePortfolio, years);
+    const portfolioSeries = calculateVolatileInvestmentSeries(baseSavingsMonthly, ratePortfolio, years);
     const endSavings = savingsSeries[savingsSeries.length - 1];
     const endPortfolio = portfolioSeries[portfolioSeries.length - 1];
 
     STATE.investment.savingsEnd = Math.round(endSavings);
     STATE.investment.portfolioEnd = Math.round(endPortfolio);
 
-    // 2. Evaluate bucket list goals met
-    // Sum total cost of bucket list items
-    let totalBucketCost = 0;
-    STATE.bucketList.forEach(x => totalBucketCost += x.cost);
-
-    // Sort items by cost (cheapest first) to simulate prioritisation
-    const sortedBucketList = [...STATE.bucketList].sort((a, b) => a.cost - b.cost);
-    
-    let achievedSavingsCount = 0;
-    let tempSavingsAcc = STATE.investment.savingsEnd;
-    sortedBucketList.forEach(item => {
-        if (tempSavingsAcc >= item.cost) {
-            achievedSavingsCount++;
-            tempSavingsAcc -= item.cost;
-        }
-    });
-
-    let achievedPortfolioCount = 0;
-    let tempPortfolioAcc = STATE.investment.portfolioEnd;
-    sortedBucketList.forEach(item => {
-        if (tempPortfolioAcc >= item.cost) {
-            achievedPortfolioCount++;
-            tempPortfolioAcc -= item.cost;
-        }
-    });
-
-    // 3. Render Modal Content
+    // 2. Compare nominal balances with inflation-adjusted purchasing power.
+    const contributedPrincipal = baseSavingsMonthly * 12 * years;
+    const inflationFactor = Math.pow(1 + INFLATION_RATE, years);
+    const realSavings = STATE.investment.savingsEnd / inflationFactor;
+    const realPortfolio = STATE.investment.portfolioEnd / inflationFactor;
     const gap = STATE.investment.portfolioEnd - STATE.investment.savingsEnd;
-    document.getElementById('report-asset-gap').innerText = `약 +${formatKoreanCurrency(gap)}`;
+    const gapSign = gap >= 0 ? '+' : '-';
+    document.getElementById('report-asset-gap').innerText = `약 ${gapSign}${formatKoreanCurrency(Math.abs(gap))}`;
+    document.getElementById('report-savings-box').classList.toggle('active-best', gap < 0);
+    document.getElementById('report-portfolio-box').classList.toggle('active-best', gap >= 0);
     
     document.getElementById('report-savings-total').innerText = formatKoreanCurrency(STATE.investment.savingsEnd);
-    document.getElementById('report-savings-achieved').innerText = `버킷리스트 ${STATE.bucketList.length}개 중 ${achievedSavingsCount}개 달성 가능`;
+    document.getElementById('report-savings-achieved').innerText = `납입 원금 ${formatKoreanCurrency(contributedPrincipal)} · 현재가치 약 ${formatKoreanCurrency(realSavings)}`;
     
     document.getElementById('report-portfolio-total').innerText = formatKoreanCurrency(STATE.investment.portfolioEnd);
-    document.getElementById('report-portfolio-achieved').innerText = `버킷리스트 ${STATE.bucketList.length}개 중 ${achievedPortfolioCount}개 모두 달성 가능! 🎉`;
+    document.getElementById('report-portfolio-achieved').innerText = `납입 원금 ${formatKoreanCurrency(contributedPrincipal)} · 현재가치 약 ${formatKoreanCurrency(realPortfolio)}`;
 
-    // Visual configurations
-    if (achievedPortfolioCount < STATE.bucketList.length) {
-        document.getElementById('report-portfolio-achieved').innerText = `버킷리스트 ${STATE.bucketList.length}개 중 ${achievedPortfolioCount}개 달성 가능`;
-    }
-
-    // Trigger celebration effects
-    Sound.playCheer();
-    Confetti.trigger(150);
+    document.getElementById('report-congrats-title').innerText = '📊 35년 자산관리 결과';
+    Sound.playSuccess();
 
     // Show Report Modal
     const reportModal = document.getElementById('report-modal');
@@ -1484,9 +1528,8 @@ function finishRacingSimulation() {
     };
 
     // Update synced results
-    STATE.investment.bucketListCount = STATE.bucketList.length;
-    STATE.investment.achievedSavingsCount = achievedSavingsCount;
-    STATE.investment.achievedPortfolioCount = achievedPortfolioCount;
+    STATE.investment.realSavingsEnd = Math.round(realSavings);
+    STATE.investment.realPortfolioEnd = Math.round(realPortfolio);
     syncStudentDataToBackend(true);
 }
 
@@ -1509,8 +1552,8 @@ function syncStudentDataToBackend(isCompleted = false) {
             targetRate: STATE.investment.targetRate,
             savingsEnd: STATE.investment.savingsEnd || 0,
             portfolioEnd: STATE.investment.portfolioEnd || 0,
-            bucketListCount: STATE.investment.bucketListCount || STATE.bucketList.length,
-            achievedCount: STATE.investment.achievedPortfolioCount || 0
+            realSavingsEnd: STATE.investment.realSavingsEnd || 0,
+            realPortfolioEnd: STATE.investment.realPortfolioEnd || 0
         }
     };
 
@@ -1524,6 +1567,12 @@ function syncStudentDataToBackend(isCompleted = false) {
 function initApp() {
     // Generate static elements first
     Confetti.init();
+
+    const linkedSessionId = new URLSearchParams(window.location.search).get('session');
+    if (/^\d{6}$/.test(linkedSessionId || '')) {
+        document.getElementById('input-session-id').value = linkedSessionId;
+        document.getElementById('input-student-name').focus();
+    }
     
     // Bind logo to go back home safely
     document.getElementById('app-logo').addEventListener('click', () => {
@@ -1579,17 +1628,12 @@ function initApp() {
         } catch (err) {
             alert("수업 세션 접속에 실패했습니다: " + err.message);
             document.getElementById('student-join-submit').disabled = false;
-            document.getElementById('student-join-submit').innerText = "시뮬레이션 입장하기";
+            document.getElementById('student-join-submit').innerText = "수업 입장하기";
         }
     });
 
-    // Binds Teacher login transitions
-    document.getElementById('go-teacher-login-btn').addEventListener('click', () => {
-        showView('teacher-login-view');
-    });
-
-    document.getElementById('teacher-login-back').addEventListener('click', () => {
-        showView('landing-view');
+    document.getElementById('btn-create-session').addEventListener('click', () => {
+        showView('teacher-setup-view');
     });
 }
 

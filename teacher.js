@@ -17,24 +17,9 @@ const STOP_WORDS = new Set([
 // 1. TEACHER AUTH & SESSION INITS
 // ----------------------------------------------------
 function initTeacher() {
-    const loginForm = document.getElementById('teacher-login-form');
-    loginForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        
-        const pin = document.getElementById('input-teacher-pin').value;
-        if (pin === '1234') {
-            Sound.playSuccess();
-            // Redirect to setup view first
-            showView('teacher-setup-view');
-        } else {
-            Sound.playWarning();
-            alert("잘못된 PIN 번호입니다! 다시 시도해 주세요. (기본 PIN: 1234)");
-        }
-    });
-
     // Setup back button
     document.getElementById('btn-setup-back').addEventListener('click', () => {
-        showView('teacher-login-view');
+        showView('landing-view');
     });
 
     // Setup complete button - generates session code and registers costs
@@ -72,6 +57,7 @@ function initTeacher() {
         
         // 4. Switch view to dashboard
         showView('teacher-dashboard-view');
+        renderSessionShare();
         startListeningToSession();
     });
 
@@ -88,6 +74,57 @@ function initTeacher() {
 
     // Mock students generator
     document.getElementById('btn-add-demo-students').addEventListener('click', addDemoStudents);
+    document.getElementById('btn-copy-session-link').addEventListener('click', copyStudentSessionLink);
+}
+
+function buildStudentSessionUrl(sessionId) {
+    const url = new URL(window.location.href);
+    url.search = '';
+    url.hash = '';
+    url.searchParams.set('session', sessionId);
+    return url.toString();
+}
+
+function renderSessionShare() {
+    const sessionUrl = buildStudentSessionUrl(currentSessionId);
+    const linkInput = document.getElementById('student-session-link');
+    const qrContainer = document.getElementById('session-qr-code');
+    const syncStatus = document.getElementById('session-sync-status');
+    linkInput.value = sessionUrl;
+    qrContainer.innerHTML = '';
+
+    if (window.QRCode) {
+        new QRCode(qrContainer, {
+            text: sessionUrl,
+            width: 168,
+            height: 168,
+            colorDark: '#0F172A',
+            colorLight: '#FFFFFF',
+            correctLevel: QRCode.CorrectLevel.M
+        });
+    } else {
+        qrContainer.textContent = 'QR을 불러오지 못했습니다. 아래 링크를 공유해 주세요.';
+    }
+
+    const isOffline = FirebaseSync.isOfflineMode();
+    syncStatus.className = `session-sync-status ${isOffline ? 'offline' : 'online'}`;
+    syncStatus.textContent = isOffline
+        ? '현재 로컬 체험 모드입니다. 다른 기기의 학생 현황을 받으려면 한 번의 온라인 연결 설정이 필요합니다.'
+        : '온라인 연결됨 · 학생들이 각자 기기에서 접속하면 현황이 자동으로 표시됩니다.';
+}
+
+async function copyStudentSessionLink() {
+    const linkInput = document.getElementById('student-session-link');
+    try {
+        await navigator.clipboard.writeText(linkInput.value);
+    } catch (error) {
+        linkInput.select();
+        document.execCommand('copy');
+    }
+
+    const button = document.getElementById('btn-copy-session-link');
+    button.textContent = '복사됨';
+    setTimeout(() => { button.textContent = '링크 복사'; }, 1500);
 }
 
 // ----------------------------------------------------
@@ -147,8 +184,8 @@ function renderStudentRoster() {
 
         if (std.stage >= 3 && std.investment && std.investment.portfolioEnd > 0) {
             const profit = std.investment.portfolioEnd - std.investment.savingsEnd;
-            const profitMan = Math.round(profit / 10000).toLocaleString('ko-KR');
-            detailsText += ` | 투자 차익: +${profitMan}만 원 (달성: ${std.investment.achievedCount}/${std.investment.bucketListCount})`;
+            const profitMan = Math.round(Math.abs(profit) / 10000).toLocaleString('ko-KR');
+            detailsText += ` | 모의 투자 격차: ${profit >= 0 ? '+' : '-'}${profitMan}만 원`;
         }
 
         card.innerHTML = `
@@ -387,10 +424,9 @@ function addDemoStudents() {
         // Calculate dream savings based on their bucket lists
         let recommendedSaving = 0;
         presetsStage1[idx].forEach(item => {
-            let months = 60;
-            if (item.ageGroup === '30s') months = 180;
-            else if (item.ageGroup === '40s') months = 360;
-            recommendedSaving += (item.cost / months);
+            const months = getGoalHorizonMonths(item.ageGroup);
+            const inflationAdjustedCost = item.cost * Math.pow(1 + INFLATION_RATE, months / 12);
+            recommendedSaving += inflationAdjustedCost / months;
         });
         const dreamSaving = Math.max(200000, Math.round(recommendedSaving / 50000) * 50000);
 
@@ -405,7 +441,7 @@ function addDemoStudents() {
                 selections: selections,
                 dreamSaving: dreamSaving
             },
-            investment: { targetRate: 5 + idx * 1.5, savingsEnd: 0, portfolioEnd: 0, bucketListCount: 0, achievedCount: 0 }
+            investment: { targetRate: Math.min(9, 5 + idx), savingsEnd: 0, portfolioEnd: 0, realSavingsEnd: 0, realPortfolioEnd: 0 }
         };
 
         // Inject to local synchronization
@@ -455,13 +491,11 @@ function addDemoStudents() {
                 // compute fake simulation values using dreamSaving
                 const baseSavings = std.realityCheck.dreamSaving;
                 const savingsSeries = calculateInvestmentSeries(baseSavings, 0.02);
-                const portfolioSeries = calculateInvestmentSeries(baseSavings, std.investment.targetRate / 100);
+                const portfolioSeries = calculateVolatileInvestmentSeries(baseSavings, std.investment.targetRate / 100);
                 const savings = savingsSeries[savingsSeries.length - 1];
                 const portfolio = portfolioSeries[portfolioSeries.length - 1];
                 std.investment.savingsEnd = Math.round(savings);
                 std.investment.portfolioEnd = Math.round(portfolio);
-                std.investment.bucketListCount = std.bucketList.length;
-                std.investment.achievedCount = std.bucketList.length - 1; // achieve most
             }
 
             localStorage.setItem(stdDataKey, JSON.stringify(std));
