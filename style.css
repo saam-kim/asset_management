@@ -1551,3 +1551,36 @@ p {
         margin: 0 auto;
     }
 }
+.report-modal-card {
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+}
+
+.report-modal-card .report-body {
+    min-height: 0;
+    flex: 1;
+}
+
+.report-modal-card .report-header,
+.report-modal-card .report-footer {
+    flex-shrink: 0;
+}
+
+.student-card-left {
+    min-width: 0;
+}
+
+.student-card-details {
+    overflow-wrap: anywhere;
+    line-height: 1.6;
+}
+
+.student-card-right,
+.student-status-indicator {
+    flex-shrink: 0;
+}
+
+.student-stage-badge {
+    white-space: nowrap;
+}

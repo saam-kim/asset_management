@@ -5,7 +5,8 @@ const INVESTMENT_START_AGE = 25;
 const INVESTMENT_END_AGE = 60;
 const INVESTMENT_YEARS = INVESTMENT_END_AGE - INVESTMENT_START_AGE;
 const INFLATION_RATE = 0.02;
-const PORTFOLIO_VOLATILITY = 0.12;
+// Educational assumptions, not historical forecasts or product returns.
+const MARKET_PATHS = {25064: '시장 경로 A', 25061: '시장 경로 B', 25063: '시장 경로 C'};
 const REQUIRED_EXPENSE_TYPES = ['meal', 'housing', 'transport', 'hobby'];
 
 // ----------------------------------------------------
@@ -26,6 +27,8 @@ const STATE = {
     },
     investment: {
         targetRate: 6.0,
+        marketSeed: 25064,
+        completed: false,
         savingsEnd: 0,
         portfolioEnd: 0,
         isSimulating: false
@@ -292,7 +295,10 @@ const Confetti = {
 
 // Helper function to format currency into Korean units
 function formatKoreanCurrency(amount) {
+    if (!Number.isFinite(amount)) return '계산 불가';
+    if (amount < 0) return `-${formatKoreanCurrency(-amount)}`;
     if (amount === 0) return '0원';
+    if (amount < 10000) return `${Math.round(amount).toLocaleString('ko-KR')}원`;
     
     const hundredMillion = Math.floor(amount / 100000000);
     const tenThousand = Math.floor((amount % 100000000) / 10000);
@@ -813,7 +819,7 @@ function renderStudentBucketList() {
         container.innerHTML = `
             <div class="empty-placeholder">
                 <div class="icon">✨</div>
-                <p>버킷리스트를 추가해 주세요!<br>AI가 전 세계 데이터로 예상 필요 자금을 알려줍니다.</p>
+                <p>버킷리스트를 추가해 주세요!<br>내장 예시 비용을 참고해 필요한 금액을 직접 정해요.</p>
             </div>
         `;
         countDisplay.innerText = '총 0개';
@@ -840,13 +846,14 @@ function renderStudentBucketList() {
             <div class="bucket-info">
                 <span class="bucket-category-badge">${icon}</span>
                 <div>
-                    <span class="bucket-name">${item.text}</span>
+                    <span class="bucket-name"></span>
                     <span style="font-size: 11px; color: var(--text-muted); margin-left: 8px;">(${ageNames[item.ageGroup]})</span>
                     <div class="bucket-cost">평균 예상 자금: ${formattedCost}</div>
                 </div>
             </div>
             <button class="delete-bucket" data-id="${item.id}">✕</button>
         `;
+        div.querySelector('.bucket-name').textContent = item.text;
         
         div.querySelector('.delete-bucket').addEventListener('click', (e) => {
             const id = e.target.dataset.id;
@@ -896,7 +903,7 @@ function getGoalHorizonMonths(ageGroup) {
     return 60;
 }
 
-function initStage2() {
+function initStage2(preserveSaving = false) {
     updateDOMCardCosts();
     
     tankCanvas = document.getElementById('water-tank-canvas');
@@ -913,7 +920,7 @@ function initStage2() {
     
     // Bind slider input with synthesized sound ticks
     let lastTickVal = STATE.realityCheck.income;
-    range.addEventListener('input', (e) => {
+    range.oninput = (e) => {
         const val = parseInt(e.target.value);
         STATE.realityCheck.income = val;
         document.getElementById('salary-display-val').innerText = `${(val / 10000).toLocaleString('ko-KR')}만 원`;
@@ -924,7 +931,7 @@ function initStage2() {
         }
         
         recalculateCashFlow();
-    });
+    };
 
     // 1. Calculate recommended monthly savings for dreams
     let monthlyBucketSaving = 0;
@@ -936,8 +943,8 @@ function initStage2() {
     STATE.realityCheck.recommendedSaving = Math.round(monthlyBucketSaving);
 
     // 2. Set default dreamSaving to recommended savings (rounded to 50k KRW)
-    const defaultSaving = Math.max(0, Math.round(STATE.realityCheck.recommendedSaving / 50000) * 50000);
-    STATE.realityCheck.dreamSaving = defaultSaving;
+    const defaultSaving = Math.min(5000000, Math.max(50000, Math.ceil(STATE.realityCheck.recommendedSaving / 50000) * 50000));
+    if (!preserveSaving) STATE.realityCheck.dreamSaving = defaultSaving;
 
     const dreamRange = document.getElementById('dream-saving-range');
     dreamRange.value = STATE.realityCheck.dreamSaving;
@@ -949,7 +956,7 @@ function initStage2() {
 
     // 3. Bind dream saving slider input
     let lastDreamTickVal = STATE.realityCheck.dreamSaving;
-    dreamRange.addEventListener('input', (e) => {
+    dreamRange.oninput = (e) => {
         const val = parseInt(e.target.value);
         STATE.realityCheck.dreamSaving = val;
         document.getElementById('dream-saving-display-val').innerText = `${(val / 10000).toLocaleString('ko-KR')}만 원`;
@@ -960,7 +967,7 @@ function initStage2() {
         }
         
         recalculateCashFlow();
-    });
+    };
 
     // Select expenses cards (Toggles & Multi-select across groups)
     const cards = document.querySelectorAll('.expense-card');
@@ -1069,7 +1076,9 @@ function recalculateCashFlow() {
     const canInvest = STATE.realityCheck.dreamSaving > 0 && netCashFlow >= 0;
     stage3Button.disabled = !canInvest;
     readinessMessage.innerText = canInvest
-        ? ''
+        ? (STATE.realityCheck.dreamSaving < STATE.realityCheck.recommendedSaving
+            ? '목표 적립 권장액보다 적습니다. 비교 실험은 가능하지만 목표 금액·시기·예산을 다시 조정해야 할 수 있어요.'
+            : '이 적립액으로 비교합니다. 비상금은 별도로 마련했다고 가정하며, 투자 원금은 보장되지 않습니다.')
         : '월 적자를 없애고 5만 원 이상을 목표 적립액으로 설정해야 다음 단계로 갈 수 있습니다.';
 
     // Sync state updates
@@ -1200,9 +1209,10 @@ function createSeededRandom(seed) {
     };
 }
 
-function calculateVolatileInvestmentSeries(monthlyContribution, expectedAnnualRate, years = INVESTMENT_YEARS) {
+function calculateVolatileInvestmentSeries(monthlyContribution, expectedAnnualRate, years = INVESTMENT_YEARS, seed = STATE.investment.marketSeed) {
     // Keep the same market shocks for every selected expected return so comparisons stay fair.
-    const random = createSeededRandom(25060);
+    const random = createSeededRandom(seed);
+    const volatility = 0.06 + Math.max(0, expectedAnnualRate - 0.03) * 2;
     const balances = [0];
     const shocks = [];
     let balance = 0;
@@ -1212,11 +1222,9 @@ function calculateVolatileInvestmentSeries(monthlyContribution, expectedAnnualRa
         const u2 = random();
         shocks.push(Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2));
     }
-    const averageShock = shocks.reduce((sum, shock) => sum + shock, 0) / shocks.length;
-
     shocks.forEach(shock => {
-        const centeredShock = shock - averageShock;
-        const annualReturn = Math.max(-0.35, Math.min(0.35, expectedAnnualRate + centeredShock * PORTFOLIO_VOLATILITY));
+        // Do not force realized returns to equal the chosen expected return.
+        const annualReturn = Math.max(-0.6, Math.min(0.6, expectedAnnualRate + shock * volatility));
         const monthlyRate = Math.pow(1 + annualReturn, 1 / 12) - 1;
 
         for (let month = 0; month < 12; month++) {
@@ -1229,6 +1237,7 @@ function calculateVolatileInvestmentSeries(monthlyContribution, expectedAnnualRa
 }
 
 function initStage3() {
+    if (tankAnimationId) cancelAnimationFrame(tankAnimationId);
     racingCanvas = document.getElementById('racing-graph-canvas');
     racingCtx = racingCanvas.getContext('2d');
     
@@ -1247,7 +1256,24 @@ function initStage3() {
         STATE.investment.targetRate = rate;
         document.getElementById('investment-rate-val').innerText = `연 ${rate.toFixed(1)}%`;
         Sound.playTick();
+        clearSimulationResult();
         drawRacingArena(0);
+        syncStudentDataToBackend();
+    };
+
+    const marketSelect = document.getElementById('market-path');
+    marketSelect.value = String(STATE.investment.marketSeed);
+    marketSelect.onchange = () => {
+        STATE.investment.marketSeed = Number(marketSelect.value);
+        clearSimulationResult();
+        drawRacingArena(0);
+        syncStudentDataToBackend();
+    };
+    document.getElementById('btn-back-budget').onclick = () => {
+        if (STATE.investment.isSimulating) return;
+        clearSimulationResult();
+        showView('student-stage2-view');
+        initStage2(true);
     };
 
     // Start racing simulation button click
@@ -1256,6 +1282,11 @@ function initStage3() {
 
     // Initial reset render
     drawRacingArena(0);
+    syncStudentDataToBackend();
+}
+
+function clearSimulationResult() {
+    Object.assign(STATE.investment, {completed: false, reflection: '', savingsEnd: 0, portfolioEnd: 0, realSavingsEnd: 0, realPortfolioEnd: 0});
 }
 
 function drawRacingArena(progress = 0) {
@@ -1448,6 +1479,9 @@ function startRacingSimulation() {
     }
 
     STATE.investment.isSimulating = true;
+    clearSimulationResult();
+    syncStudentDataToBackend();
+    ['investment-rate-range', 'market-path', 'btn-back-budget'].forEach(id => document.getElementById(id).disabled = true);
     document.getElementById('btn-start-simulation').disabled = true;
     document.getElementById('sim-speed-indicator').innerText = "⏱️ 시뮬레이터 달리는 중...";
     racingProgress = 0;
@@ -1465,6 +1499,7 @@ function startRacingSimulation() {
             racingAnimationId = requestAnimationFrame(step);
         } else {
             STATE.investment.isSimulating = false;
+            ['investment-rate-range', 'market-path', 'btn-back-budget'].forEach(id => document.getElementById(id).disabled = false);
             document.getElementById('btn-start-simulation').disabled = false;
             document.getElementById('sim-speed-indicator').innerText = "";
             finishRacingSimulation();
@@ -1507,11 +1542,18 @@ function finishRacingSimulation() {
     document.getElementById('report-portfolio-achieved').innerText = `납입 원금 ${formatKoreanCurrency(contributedPrincipal)} · 현재가치 약 ${formatKoreanCurrency(realPortfolio)}`;
 
     document.getElementById('report-congrats-title').innerText = '📊 35년 자산관리 결과';
+    document.getElementById('report-conditions').textContent = `월 ${formatKoreanCurrency(baseSavingsMonthly)} · 기대수익률 ${STATE.investment.targetRate}% · ${MARKET_PATHS[STATE.investment.marketSeed]} · 목표 비용 인출 없이 35년 적립한 비교 실험`;
     Sound.playSuccess();
 
     // Show Report Modal
     const reportModal = document.getElementById('report-modal');
     reportModal.style.display = 'flex';
+    const reflection = document.getElementById('report-reflection');
+    reflection.value = STATE.investment.reflection || '';
+    reflection.onchange = () => {
+        STATE.investment.reflection = reflection.value.trim().slice(0, 300);
+        syncStudentDataToBackend(true);
+    };
 
     // Binds modal action buttons
     document.getElementById('btn-report-close').onclick = () => {
@@ -1522,12 +1564,13 @@ function finishRacingSimulation() {
     
     document.getElementById('btn-report-restart').onclick = () => {
         reportModal.style.display = 'none';
-        startRacingSimulation();
+        // Return to the controls to change one variable before comparing again.
     };
 
     // Update synced results
     STATE.investment.realSavingsEnd = Math.round(realSavings);
     STATE.investment.realPortfolioEnd = Math.round(realPortfolio);
+    STATE.investment.completed = true;
     syncStudentDataToBackend(true);
 }
 
@@ -1548,6 +1591,9 @@ function syncStudentDataToBackend(isCompleted = false) {
         },
         investment: {
             targetRate: STATE.investment.targetRate,
+            marketSeed: STATE.investment.marketSeed,
+            completed: STATE.investment.completed,
+            reflection: STATE.investment.reflection || '',
             savingsEnd: STATE.investment.savingsEnd || 0,
             portfolioEnd: STATE.investment.portfolioEnd || 0,
             realSavingsEnd: STATE.investment.realSavingsEnd || 0,

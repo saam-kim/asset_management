@@ -200,7 +200,7 @@ function renderStudentRoster() {
 
         // Stage labels
         const stages = ['드림 보드 작성', '리얼리티 체크', '자산 시뮬레이션'];
-        const activeStage = stages[std.stage - 1] || '체험 완료';
+        const activeStage = std.investment?.completed ? '비교 완료' : (stages[std.stage - 1] || '체험 중');
         const activeClass = std.stage === 1 ? 'stage-1' : std.stage === 2 ? 'stage-2' : 'stage-3';
 
         // Calculate goals details
@@ -211,24 +211,40 @@ function renderStudentRoster() {
             detailsText = `버킷 목표 ${std.bucketList.length}개 (${sumCostMan}만 원)`;
         }
 
+        if (std.realityCheck) {
+            const cash = std.realityCheck;
+            const net = (cash.income || 0) - (cash.expenses || 0) - (cash.dreamSaving || 0);
+            detailsText += ` | 월 적립 ${formatKoreanCurrency(cash.dreamSaving || 0)} · ${net < 0 ? '예산 적자: 조정 필요' : '월 적자 없음'}`;
+        }
         if (std.stage >= 3 && std.investment && std.investment.portfolioEnd > 0) {
             const profit = std.investment.portfolioEnd - std.investment.savingsEnd;
             const profitMan = Math.round(Math.abs(profit) / 10000).toLocaleString('ko-KR');
             detailsText += ` | 모의 투자 격차: ${profit >= 0 ? '+' : '-'}${profitMan}만 원`;
+            detailsText += ` · 기대 ${std.investment.targetRate}% · ${MARKET_PATHS[std.investment.marketSeed] || '기존 경로'}`;
         }
 
         card.innerHTML = `
             <div class="student-card-left">
                 <div class="student-status-indicator ${activeClass}"></div>
                 <div>
-                    <div class="student-card-name">${std.name}</div>
-                    <div class="student-card-details">${detailsText}</div>
+                    <div class="student-card-name"></div>
+                    <div class="student-card-details"></div>
                 </div>
             </div>
             <div class="student-card-right">
-                <span class="student-stage-badge stage-badge-${std.stage}">${activeStage}</span>
+                <span class="student-stage-badge stage-badge-${[1, 2, 3].includes(std.stage) ? std.stage : 1}">${activeStage}</span>
             </div>
         `;
+
+        // Student-authored names and reflections must never be parsed as HTML.
+        card.querySelector('.student-card-name').textContent = std.name;
+        card.querySelector('.student-card-details').textContent = detailsText;
+        if (std.investment?.reflection) {
+            const reflection = document.createElement('p');
+            reflection.className = 'student-card-details';
+            reflection.textContent = `선택 이유: ${std.investment.reflection}`;
+            card.querySelector('.student-card-left > div:last-child').appendChild(reflection);
+        }
 
         container.appendChild(card);
     });

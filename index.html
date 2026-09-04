@@ -52,7 +52,7 @@
                     <h1 class="landing-title">꿈을 여는 돈길: 버킷 리스트와 자산관리</h1>
                     <p class="landing-desc">
                         내가 꿈꾸는 미래의 삶에는 얼마가 필요할까요?<br>
-                        AI 비용 추산, 현실적인 수입과 지출 관리, 그리고 은행 적금과 자산 투자의 놀라운 복리 격차를 게임처럼 재미있게 확인해 보세요.
+                        목표 비용을 예상하고 수입과 지출을 조정한 뒤, 저축과 투자의 수익·위험을 비교해 보세요.
                     </p>
                     <button class="btn btn-primary" id="btn-create-session" style="align-self: flex-start;">
                         새 수업 만들기
@@ -234,6 +234,11 @@
             </div>
 
             <div class="teacher-grid">
+                <div class="glass-card" style="grid-column: 1 / -1;">
+                    <h2>수업 진행: 목표 → 예산 → 비교 → 설명</h2>
+                    <p>목표 2개 작성(5분) → 적자 없는 예산 만들기(5분) → 조건을 하나씩 바꿔 비교(10분) → 선택 이유 나누기(5분).</p>
+                    <p>결과 금액으로 순위를 매기지 마세요. 월 적립액·기대수익률·시장 경로가 같아야 결과를 공정하게 비교할 수 있습니다. “손실이 나도 유지할 수 있는 금액인가?”, “가까운 목표 자금을 투자해도 될까?”를 함께 질문하세요.</p>
+                </div>
                 <!-- Students List -->
                 <div class="glass-card teacher-student-panel">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
@@ -321,7 +326,7 @@
                             <div class="bucket-input-wrapper">
                                 <input type="text" id="input-bucket-text" class="form-input" placeholder="예: 스위스 한달 살기, 아이패드 프로 사기" maxlength="30">
                                 <button class="btn btn-primary" id="btn-estimate-cost" style="white-space: nowrap; padding: 0 20px;">
-                                    🤖 AI 비용 분석
+                                    💡 예시 비용 살펴보기
                                 </button>
                             </div>
                         </div>
@@ -338,7 +343,7 @@
                     <div class="bucket-list-panel empty" id="student-bucket-panel">
                         <div class="empty-placeholder">
                             <div class="icon">✨</div>
-                            <p>버킷리스트를 추가해 주세요!<br>AI가 전 세계 데이터로 예상 필요 자금을 알려줍니다.</p>
+                            <p>버킷리스트를 추가해 주세요!<br>내장 예시 비용을 참고해 필요한 금액을 직접 정해요.</p>
                         </div>
                     </div>
                     
@@ -434,6 +439,7 @@
                         <!-- Expense Group 3: Transportation -->
                         <div class="expense-group">
                             <div class="expense-title">교통 및 차량</div>
+                            <p style="font-size: 13px;">자가 주택·차량은 이미 보유한 경우의 유지비입니다. 구입비·보증금·대출 원금은 별도이므로 저렴한 월 비용만으로 비교하지 마세요.</p>
                             <div class="expense-cards" id="expense-group-transport">
                                 <div class="expense-card active" data-type="transport" data-id="trans_public" data-cost="100000">
                                     <span class="expense-card-icon">🚌</span>
@@ -523,7 +529,8 @@
             <div class="dream-header">
                 <span class="badge">Stage 3</span>
                 <h2>자산 증식 시뮬레이터: 저축 vs 투자</h2>
-                <p>여유 자금을 어떻게 굴려야 더 빨리, 더 많이 자산을 모을 수 있을까요? 25세부터 60세까지 35년 동안 은행 예적금과 나만의 자산 투자 포트폴리오의 격차를 생생하게 체험해 보세요.</p>
+                <p>같은 금액을 25세부터 60세까지 35년 동안 적립하면 어떻게 달라질까요? 수익뿐 아니라 손실 가능성도 비교해 보세요.</p>
+                <button class="btn btn-secondary" id="btn-back-budget" type="button">← 예산 수정하기</button>
             </div>
 
             <div class="invest-layout">
@@ -566,7 +573,15 @@
                 <div class="simulation-assumptions">
                     <strong>이 시뮬레이션의 현실 가정</strong>
                     <span>연 2% 물가상승 · 월 적립액은 명목금액으로 고정 · 분산투자도 매년 손익 변동 · 세금과 수수료는 제외</span>
-                    <span>그래프는 가능한 시장 경로 한 가지이며 미래 수익을 보장하지 않습니다.</span>
+                    <span>2단계 목표 적립액을 비교용 월 납입액으로 사용합니다. 목표 지출·비상금 인출·소득 변화는 계산하지 않으므로 실제 생애 자산이나 목표 달성 결과가 아닙니다.</span>
+                    <span>기대수익률을 높일수록 변동폭도 커집니다. 내장 시장 경로는 학습용 예시이며 실제 통계나 미래 예측이 아닙니다. 같은 조건·경로는 같은 결과로 재현됩니다.</span>
+                    <label for="market-path">비교할 시장 경로</label>
+                    <select id="market-path" class="form-input">
+                        <option value="25064">시장 경로 A</option>
+                        <option value="25061">시장 경로 B</option>
+                        <option value="25063">시장 경로 C</option>
+                    </select>
+                    <span>처음에는 A로 진행하고, 다시 할 때 적립액 또는 시장 경로 중 하나만 바꿔 보세요.</span>
                 </div>
 
                 <!-- Simulation Graph Arena -->
@@ -615,8 +630,8 @@
                     <div class="ai-spinner-circle"></div>
                     <div class="ai-spinner-icon">🤖</div>
                 </div>
-                <div class="ai-loading-text">AI 비용 분석가가 분석 중입니다...</div>
-                <p style="font-size: 13px;">전 세계 시세 및 연령대별 생활물가 통계를 탐색하여 적합한 필요 자금을 계산 중입니다.</p>
+                <div class="ai-loading-text">참고용 비용을 준비하고 있어요...</div>
+                <p style="font-size: 13px;">기본값은 내장 예시입니다. 실시간 시세가 아니므로 실제 가격과 비교하고 직접 수정해 주세요.</p>
             </div>
             <!-- Result View -->
             <div class="ai-result-view" id="ai-result-view">
@@ -661,6 +676,7 @@
                 <p>25세부터 60세까지 같은 금액을 매월 적립한 모의 결과입니다.</p>
             </div>
             <div class="report-body">
+                <p id="report-conditions"></p>
                 <div class="report-summary-box">
                     <div class="report-summary-title">예적금 대비 분산투자 명목 자산 격차</div>
                     <div class="report-summary-value" id="report-asset-gap">약 +1억 4,300만 원</div>
@@ -687,10 +703,12 @@
                         <li><strong>수익과 위험:</strong> 높은 기대수익에는 더 큰 손실 가능성이 따릅니다. 기간과 감당 가능한 위험에 맞춰 분산하고 꾸준히 점검해야 합니다.</li>
                     </ul>
                 </div>
+                <label for="report-reflection">나의 선택 이유 한 줄 (선택, 교사에게 공유)</label>
+                <textarea id="report-reflection" class="form-input" maxlength="300" rows="3" placeholder="예: 5년 안에 쓸 돈은 저축하고, 오래 유지할 수 있는 금액만 투자하고 싶다."></textarea>
             </div>
             <div class="report-footer">
-                <button class="btn btn-secondary" id="btn-report-restart">🔄 다시 시뮬레이션하기</button>
-                <button class="btn btn-primary" id="btn-report-close">대시보드로 돌아가기</button>
+                <button class="btn btn-secondary" id="btn-report-restart">조건 바꿔 비교하기</button>
+                <button class="btn btn-primary" id="btn-report-close">결과 확인 완료</button>
             </div>
         </div>
     </div>
